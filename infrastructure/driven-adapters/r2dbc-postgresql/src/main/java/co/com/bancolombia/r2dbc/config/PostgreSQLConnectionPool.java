@@ -7,10 +7,12 @@ import io.r2dbc.postgresql.PostgresqlConnectionFactory;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.data.r2dbc.config.EnableR2dbcAuditing;
 
 import java.time.Duration;
 
 @Configuration
+@EnableR2dbcAuditing
 @EnableConfigurationProperties(PostgresqlConnectionProperties.class)
 public class PostgreSQLConnectionPool {
     /* Change these values for your project */

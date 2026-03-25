@@ -1,0 +1,10 @@
+dependencies {
+    implementation project(':model')
+    implementation 'org.springframework:spring-context'
+    implementation platform('org.springframework.cloud:spring-cloud-dependencies:2025.0.0')
+    implementation 'org.springframework.cloud:spring-cloud-starter-openfeign'
+    implementation 'io.projectreactor:reactor-core'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'io.projectreactor:reactor-test'
+}

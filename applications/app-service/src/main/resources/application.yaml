@@ -16,18 +16,44 @@ management:
     health:
       probes:
         enabled: true
+  health:
+    circuitbreakers:
+      enabled: true
 cors:
   allowed-origins: "http://localhost:4200,http://localhost:8080"
-
 adapters:
   postgresql:
-    host: localhost
+    host: "localhost"
     port: 5432
-    database: ms_immobilie
-    schema: public
-    username: postgres
-    password: postgres
-
+    database: "ms_immobilie"
+    schema: "public"
+    username: "postgres"
+    password: "postgres"
 springdoc:
   use-fn-handler-mapping: true
-  packages-to-scan: co.com.bancolombia
+  packages-to-scan: "co.com.bancolombia"
+adapter:
+  restconsumer:
+    timeout: 5000
+    url: "http://localhost:8080/api/v1/user"
+resilience4j:
+  circuitbreaker:
+    instances:
+      testGet:
+        registerHealthIndicator: true
+        failureRateThreshold: 50
+        slowCallRateThreshold: 50
+        slowCallDurationThreshold: "2s"
+        permittedNumberOfCallsInHalfOpenState: 3
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 10
+        waitDurationInOpenState: "10s"
+      testPost:
+        registerHealthIndicator: true
+        failureRateThreshold: 50
+        slowCallRateThreshold: 50
+        slowCallDurationThreshold: "2s"
+        permittedNumberOfCallsInHalfOpenState: 3
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 10
+        waitDurationInOpenState: "10s"

@@ -62,7 +62,7 @@ class ArchitectureTest {
     static void exportIssues() {
         try {
             ObjectMapper mapper = new ObjectMapper();
-            List.of("/home/jonatan-restrepo/Documentos/proyectos/arriendo-facil/ms-immobilie/","/home/jonatan-restrepo/Documentos/proyectos/arriendo-facil/ms-immobilie/domain/model/","/home/jonatan-restrepo/Documentos/proyectos/arriendo-facil/ms-immobilie/infrastructure/driven-adapters/r2dbc-postgresql/","/home/jonatan-restrepo/Documentos/proyectos/arriendo-facil/ms-immobilie/infrastructure/entry-points/reactive-web/","/home/jonatan-restrepo/Documentos/proyectos/arriendo-facil/ms-immobilie/domain/usecase/","/home/jonatan-restrepo/Documentos/proyectos/arriendo-facil/ms-immobilie/applications/app-service/").forEach(path -> {
+            List.of("/home/jonatan-restrepo/Documentos/proyectos/arriendo-facil/ms-immobilie/","/home/jonatan-restrepo/Documentos/proyectos/arriendo-facil/ms-immobilie/domain/model/","/home/jonatan-restrepo/Documentos/proyectos/arriendo-facil/ms-immobilie/infrastructure/driven-adapters/r2dbc-postgresql/","/home/jonatan-restrepo/Documentos/proyectos/arriendo-facil/ms-immobilie/infrastructure/driven-adapters/async-event-bus/","/home/jonatan-restrepo/Documentos/proyectos/arriendo-facil/ms-immobilie/infrastructure/entry-points/reactive-web/","/home/jonatan-restrepo/Documentos/proyectos/arriendo-facil/ms-immobilie/domain/usecase/","/home/jonatan-restrepo/Documentos/proyectos/arriendo-facil/ms-immobilie/applications/app-service/").forEach(path -> {
                 try {
                     Files.write(Path.of(path, "build/issues.json"), mapper.writeValueAsBytes(issues.getOrDefault(path, new Utils.IssuesReport())));
                 } catch (IOException e) {
