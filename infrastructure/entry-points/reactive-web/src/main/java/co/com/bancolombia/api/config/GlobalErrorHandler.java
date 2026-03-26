@@ -10,7 +10,6 @@ import co.com.bancolombia.model.exception.UnauthorizedException;
 import co.com.bancolombia.model.exception.ValidationException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.ConstraintViolationException;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;
 import org.springframework.core.io.buffer.DataBuffer;
@@ -28,12 +27,11 @@ import java.util.stream.Collectors;
 @Component
 @Order(-2)
 @Slf4j
-@RequiredArgsConstructor
 public class GlobalErrorHandler implements WebExceptionHandler {
 
     public static final String USER_ID_HEADER = "X-User-Id";
 
-    private final ObjectMapper objectMapper;
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     @Override
     public Mono<Void> handle(ServerWebExchange exchange, Throwable ex) {
@@ -109,7 +107,7 @@ public class GlobalErrorHandler implements WebExceptionHandler {
         exchange.getResponse().setStatusCode(status);
         exchange.getResponse().getHeaders().setContentType(MediaType.APPLICATION_JSON);
         try {
-            byte[] bytes = objectMapper.writeValueAsBytes(body);
+            byte[] bytes = OBJECT_MAPPER.writeValueAsBytes(body);
             DataBuffer buffer = exchange.getResponse().bufferFactory().wrap(ByteBuffer.wrap(bytes));
             return exchange.getResponse().writeWith(Mono.just(buffer));
         } catch (Exception e) {

@@ -4,6 +4,8 @@ import co.com.bancolombia.api.dto.common.ErrorResponse;
 import co.com.bancolombia.api.dto.inmueble.CreateInmuebleDto;
 import co.com.bancolombia.api.dto.inmueble.InmuebleResponse;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.parameters.RequestBody;
@@ -41,14 +43,25 @@ public class InmuebleRouter {
                     Crea y publica un nuevo aviso de inmueble en la plataforma.
 
                     **Reglas de negocio:**
-                    - El campo `userId` identifica al propietario del aviso. Será reemplazado por extracción desde JWT cuando se implemente autenticación.
-                    - Los usuarios con **plan gratuito** tienen un límite de **2 propiedades activas** simultáneas. Superar ese límite retorna `403 Forbidden`.
+                    - La identidad del propietario se extrae del header `X-User-Id`, propagado por el API Gateway. Si el header está ausente, se retorna `401 Unauthorized`.
+                    - Los usuarios con **plan gratuito** tienen un límite de **2 propiedades vigentes** simultáneas (estados `ACTIVE`, `INACTIVE` y `PAUSED`). Superar ese límite retorna `403 Forbidden`.
                     - Las fotos se incluyen en el cuerpo del request (campo `fotos`). Se admiten entre 1 y 20 fotos.
                     - La foto con `order = 1` se considera la **portada** del aviso y es la que se muestra en los listados.
+                    - Los valores de `order` dentro de la lista de fotos deben ser **únicos**. Dos fotos con el mismo `order` retornan `400 Bad Request`.
                     - El inmueble queda publicado con estado `ACTIVE` y una **vigencia de 30 días** desde la fecha de creación (`expiresAt`).
                     - El servicio depende de **ms-user** para validar la existencia y el plan del propietario. Si ms-user no está disponible, se retorna `503 Service Unavailable`.
                     """,
                 tags = {"Inmuebles"},
+                parameters = {
+                    @Parameter(
+                        name = "X-User-Id",
+                        in = ParameterIn.HEADER,
+                        description = "Identificador del usuario propietario, propagado por el API Gateway. Requerido — su ausencia retorna 401.",
+                        required = true,
+                        example = "usr_01HX9Z",
+                        schema = @Schema(type = "string")
+                    )
+                },
                 requestBody = @RequestBody(
                     description = "Datos del inmueble y sus fotos",
                     required = true,
@@ -68,7 +81,15 @@ public class InmuebleRouter {
                     ),
                     @ApiResponse(
                         responseCode = "400",
-                        description = "Datos de entrada inválidos — validación de campos fallida",
+                        description = "Datos de entrada inválidos — validación de campos fallida o valores de `order` duplicados en la lista de fotos (errorCode: `VALIDATION_ERROR`)",
+                        content = @Content(
+                            mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class)
+                        )
+                    ),
+                    @ApiResponse(
+                        responseCode = "401",
+                        description = "Header `X-User-Id` ausente o vacío — el API Gateway no propagó la identidad del usuario (errorCode: `MISSING_USER_IDENTITY`)",
                         content = @Content(
                             mediaType = MediaType.APPLICATION_JSON_VALUE,
                             schema = @Schema(implementation = ErrorResponse.class)
@@ -76,7 +97,7 @@ public class InmuebleRouter {
                     ),
                     @ApiResponse(
                         responseCode = "403",
-                        description = "Límite de propiedades activas excedido — el plan gratuito permite máximo 2 propiedades activas",
+                        description = "Límite de propiedades vigentes excedido — el plan gratuito permite máximo 2 propiedades vigentes (ACTIVE, INACTIVE o PAUSED) (errorCode: `PLAN_LIMIT_EXCEEDED`)",
                         content = @Content(
                             mediaType = MediaType.APPLICATION_JSON_VALUE,
                             schema = @Schema(implementation = ErrorResponse.class)

@@ -15,7 +15,7 @@ public record FotoDto(
         @URL(message = "La URL de la foto no es válida")
         String url,
 
-        @Schema(description = "Posición de la foto en la galería (1 = portada)", example = "1", minimum = "1", maximum = "20")
+        @Schema(description = "Posición de la foto en la galería (1 = portada). Debe ser único dentro de la lista — dos fotos no pueden compartir el mismo valor de `order`.", example = "1", minimum = "1", maximum = "20")
         @NotNull(message = "El orden de la foto es obligatorio")
         @Min(value = 1, message = "El orden mínimo es 1")
         @Max(value = 20, message = "El orden máximo es 20")
