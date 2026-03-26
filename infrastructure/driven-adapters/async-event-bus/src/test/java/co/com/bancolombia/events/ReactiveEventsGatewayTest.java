@@ -1,20 +1,29 @@
 package co.com.bancolombia.events;
 
+import io.cloudevents.CloudEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
-import reactor.core.publisher.Mono;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import org.reactivecommons.api.domain.DomainEventBus;
-
-import io.cloudevents.CloudEvent;
+import reactor.core.publisher.Mono;
+import reactor.test.StepVerifier;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class ReactiveEventsGatewayTest {
 
     @Mock
@@ -25,84 +34,131 @@ class ReactiveEventsGatewayTest {
 
     private ReactiveEventsGateway gateway;
 
+    private static final Object DUMMY_EVENT = new Object();
+
     @BeforeEach
     void setUp() {
-        MockitoAnnotations.openMocks(this);
-        gateway = new ReactiveEventsGateway(domainEventBus, objectMapper);
+        when(objectMapper.valueToTree(any())).thenReturn(mock(ObjectNode.class));
         when(domainEventBus.emit(any(CloudEvent.class))).thenReturn(Mono.empty());
+        gateway = new ReactiveEventsGateway(domainEventBus, objectMapper);
     }
 
+    // -------------------------------------------------------------------------
+    // emit()
+    // -------------------------------------------------------------------------
+
     @Test
-    void testEmitLogsEvent() {
-        Object event = new Object() {
-            @Override
-            public String toString() {
-                return "testEvent";
-            }
-        };
-
-        when(objectMapper.valueToTree(event)).thenReturn(mock(ObjectNode.class));
-
-        gateway.emit(event).block();
+    void emit_delegatesToDomainEventBus() {
+        gateway.emit(DUMMY_EVENT).block();
 
         verify(domainEventBus, times(1)).emit(any(CloudEvent.class));
     }
 
-   @Test
-    void testEmitConstructsCloudEvent() {
-        Object event = new Object() {
-            public String toString() { return "testEvent"; }
-        };
+    @Test
+    void emit_cloudEvent_hasCorrectType() {
+        ArgumentCaptor<CloudEvent> captor = ArgumentCaptor.forClass(CloudEvent.class);
 
-        when(objectMapper.valueToTree(event)).thenReturn(mock(ObjectNode.class));
+        gateway.emit(DUMMY_EVENT).block();
 
-        gateway.emit(event).block();
-
-        ArgumentCaptor<CloudEvent> eventCaptor = ArgumentCaptor.forClass(CloudEvent.class);
-        verify(domainEventBus, times(1)).emit(eventCaptor.capture());
-
-        CloudEvent cloudEvent = eventCaptor.getValue();
-        assertEquals(ReactiveEventsGateway.SOME_EVENT_NAME, cloudEvent.getType());
-        assertEquals("https://reactive-commons.org/foos", cloudEvent.getSource().toString());
+        verify(domainEventBus).emit(captor.capture());
+        assertThat(captor.getValue().getType())
+                .isEqualTo(ReactiveEventsGateway.INMUEBLE_CREATED_EVENT);
     }
 
+    @Test
+    void emit_cloudEvent_hasCorrectSource() {
+        ArgumentCaptor<CloudEvent> captor = ArgumentCaptor.forClass(CloudEvent.class);
 
-        @Test
-        void testNotifyLogsEvent() {
-            Object event = new Object() {
-                @Override
-                public String toString() {
-                    return "testNotificationEvent";
-                }
-            };
+        gateway.emit(DUMMY_EVENT).block();
 
-            when(objectMapper.valueToTree(event)).thenReturn(mock(ObjectNode.class));
+        verify(domainEventBus).emit(captor.capture());
+        assertThat(captor.getValue().getSource().toString())
+                .isEqualTo(ReactiveEventsGateway.EVENT_SOURCE);
+    }
 
-            gateway.notify(event).block();
+    @Test
+    void emit_cloudEvent_hasNonNullId() {
+        ArgumentCaptor<CloudEvent> captor = ArgumentCaptor.forClass(CloudEvent.class);
 
-            verify(domainEventBus, times(1)).emit(any(CloudEvent.class));
-        }
+        gateway.emit(DUMMY_EVENT).block();
 
-       @Test
-        void testNotifyConstructsCloudEvent() {
-            Object event = new Object() {
-                public String toString() { return "testNotificationEvent"; }
-            };
+        verify(domainEventBus).emit(captor.capture());
+        assertThat(captor.getValue().getId()).isNotBlank();
+    }
 
-            when(objectMapper.valueToTree(event)).thenReturn(mock(ObjectNode.class));
+    @Test
+    void emit_cloudEvent_hasNonNullTime() {
+        ArgumentCaptor<CloudEvent> captor = ArgumentCaptor.forClass(CloudEvent.class);
 
-            gateway.notify(event).block();
+        gateway.emit(DUMMY_EVENT).block();
 
-            ArgumentCaptor<CloudEvent> eventCaptor = ArgumentCaptor.forClass(CloudEvent.class);
-            verify(domainEventBus, times(1)).emit(eventCaptor.capture());
+        verify(domainEventBus).emit(captor.capture());
+        assertThat(captor.getValue().getTime()).isNotNull();
+    }
 
-            CloudEvent cloudEvent = eventCaptor.getValue();
-            assertEquals(ReactiveEventsGateway.SOME_NOTIFICATION_NAME, cloudEvent.getType());
-            assertEquals("https://reactive-commons.org/foos", cloudEvent.getSource().toString());
-        }
+    @Test
+    void emit_cloudEvent_hasJsonData() {
+        ArgumentCaptor<CloudEvent> captor = ArgumentCaptor.forClass(CloudEvent.class);
 
+        gateway.emit(DUMMY_EVENT).block();
 
+        verify(domainEventBus).emit(captor.capture());
+        assertThat(captor.getValue().getData()).isNotNull();
+    }
 
+    @Test
+    void emit_returnsMonoVoid() {
+        StepVerifier.create(gateway.emit(DUMMY_EVENT))
+                .verifyComplete();
+    }
 
+    @Test
+    void emit_whenDomainEventBusFails_propagatesError() {
+        when(domainEventBus.emit(any(CloudEvent.class)))
+                .thenReturn(Mono.error(new RuntimeException("bus error")));
 
+        StepVerifier.create(gateway.emit(DUMMY_EVENT))
+                .expectErrorMatches(ex -> ex instanceof RuntimeException
+                        && "bus error".equals(ex.getMessage()))
+                .verify();
+    }
+
+    // -------------------------------------------------------------------------
+    // notify()
+    // -------------------------------------------------------------------------
+
+    @Test
+    void notify_delegatesToDomainEventBus() {
+        gateway.notify(DUMMY_EVENT).block();
+
+        verify(domainEventBus, times(1)).emit(any(CloudEvent.class));
+    }
+
+    @Test
+    void notify_cloudEvent_hasCorrectType() {
+        ArgumentCaptor<CloudEvent> captor = ArgumentCaptor.forClass(CloudEvent.class);
+
+        gateway.notify(DUMMY_EVENT).block();
+
+        verify(domainEventBus).emit(captor.capture());
+        assertThat(captor.getValue().getType())
+                .isEqualTo(ReactiveEventsGateway.INMUEBLE_CREATED_EVENT);
+    }
+
+    @Test
+    void notify_cloudEvent_hasCorrectSource() {
+        ArgumentCaptor<CloudEvent> captor = ArgumentCaptor.forClass(CloudEvent.class);
+
+        gateway.notify(DUMMY_EVENT).block();
+
+        verify(domainEventBus).emit(captor.capture());
+        assertThat(captor.getValue().getSource().toString())
+                .isEqualTo(ReactiveEventsGateway.EVENT_SOURCE);
+    }
+
+    @Test
+    void notify_returnsMonoVoid() {
+        StepVerifier.create(gateway.notify(DUMMY_EVENT))
+                .verifyComplete();
+    }
 }

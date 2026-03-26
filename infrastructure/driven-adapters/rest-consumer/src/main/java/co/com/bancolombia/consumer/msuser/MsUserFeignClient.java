@@ -6,10 +6,11 @@ import org.springframework.web.bind.annotation.PathVariable;
 
 import java.util.Map;
 
-// url: static for now — remove this attribute and Eureka will resolve by name automatically
-@FeignClient(name = "ms-user", url = "${clients.ms-user.url}")
+// NOTA: Cuando se active Eureka, eliminar el atributo `url` y el Feign Client
+// resolverá "ms-user" automáticamente vía Spring Cloud LoadBalancer.
+@FeignClient(name = "ms-user", url = "${clients.ms-user.url}", fallbackFactory = MsUserFeignClientFallbackFactory.class)
 public interface MsUserFeignClient {
 
-    @GetMapping("/api/user/{id}")
-    Map<String, Object> findById(@PathVariable String id);
+    @GetMapping("/api/v1/user/{id}")
+    Map<String, Object> findById(@PathVariable("id") String id);
 }

@@ -31,7 +31,7 @@ public class CrearInmuebleUseCase {
 
     public Mono<InmuebleConFotos> execute(Inmueble inmueble, List<Foto> photos) {
         return checkPlanLimit(inmueble.getUserId())
-                .then(buildAndSaveInmueble(inmueble))
+                .then(Mono.defer(() -> buildAndSaveInmueble(inmueble)))
                 .flatMap(saved -> savePhotos(photos, saved)
                         .flatMap(savedPhotos -> publishEventAndReturn(saved, savedPhotos)));
     }

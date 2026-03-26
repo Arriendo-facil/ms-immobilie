@@ -1,5 +1,14 @@
 apply plugin: 'org.springframework.boot'
 
+// amqp-client:5.27.1 (gestionado por Spring Boot BOM) tiene useNio() con return type incompatible con reactor-rabbitmq:1.5.6
+// amqp-client:5.28.0 restaura la compatibilidad binaria y tiene netty() requerido por async-commons-rabbit-starter:7.0.5
+// El propio reactive-commons-java v7.0.5 fuerza esta misma versión en su build
+dependencyManagement {
+    dependencies {
+        dependency 'com.rabbitmq:amqp-client:5.28.0'
+    }
+}
+
 dependencies {
 	implementation project(':rest-consumer')
 	implementation 'org.springframework.boot:spring-boot-starter-webflux'

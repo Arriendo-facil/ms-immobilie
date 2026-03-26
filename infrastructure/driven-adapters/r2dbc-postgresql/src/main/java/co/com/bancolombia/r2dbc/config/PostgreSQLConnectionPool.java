@@ -34,10 +34,18 @@ public class PostgreSQLConnectionPool {
 
         ConnectionPoolConfiguration poolConfiguration = ConnectionPoolConfiguration.builder()
                 .connectionFactory(new PostgresqlConnectionFactory(dbConfiguration))
-                .name("api-postgres-connection-pool")
+                .name("ms-immobilie-postgres-pool")
                 .initialSize(INITIAL_SIZE)
                 .maxSize(MAX_SIZE)
+                // Libera conexiones inactivas antes de que el servidor las cierre
                 .maxIdleTime(Duration.ofMinutes(MAX_IDLE_TIME))
+                // Rota conexiones longevas para evitar conexiones "zombie"
+                .maxLifeTime(Duration.ofMinutes(60))
+                // Falla rápido si no hay conexión libre en el pool (evita cola infinita)
+                .maxAcquireTime(Duration.ofSeconds(5))
+                // Reintentos para adquirir conexión ante fallo transitorio del pool
+                .acquireRetry(2)
+                // Valida la conexión contra la BD real antes de entregarla al caller
                 .validationQuery("SELECT 1")
                 .build();
 

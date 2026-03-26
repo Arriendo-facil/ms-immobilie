@@ -1,9 +1,14 @@
 dependencies {
     implementation project(':model')
     implementation 'org.springframework:spring-context'
-    implementation platform('org.springframework.cloud:spring-cloud-dependencies:2025.0.0')
+    implementation platform('org.springframework.cloud:spring-cloud-dependencies:2025.1.1')
     implementation 'org.springframework.cloud:spring-cloud-starter-openfeign'
+    // Spring Cloud LoadBalancer — requerido por Feign Circuit Breaker y futuro Eureka
+    implementation 'org.springframework.cloud:spring-cloud-starter-loadbalancer'
     implementation 'io.projectreactor:reactor-core'
+
+    // Eureka Client — preparado para service discovery (descomentar cuando se active el eureka-server)
+    // implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client'
 
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'io.projectreactor:reactor-test'
