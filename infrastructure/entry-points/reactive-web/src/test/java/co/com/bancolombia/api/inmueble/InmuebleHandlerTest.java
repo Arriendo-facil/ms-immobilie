@@ -13,6 +13,9 @@ import co.com.bancolombia.model.inmueble.InmuebleConFotos;
 import co.com.bancolombia.model.inmueble.InmuebleStatus;
 import co.com.bancolombia.model.inmueble.PropertyType;
 import co.com.bancolombia.usecase.crearInmueble.CrearInmuebleUseCase;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.reactive.WebFluxTest;
@@ -35,6 +38,7 @@ import static org.mockito.Mockito.when;
 class InmuebleHandlerTest {
 
     private static final String URL = "/api/v1/inmuebles";
+    private static final ObjectMapper TEST_MAPPER = new ObjectMapper();
 
     @Autowired
     private WebTestClient webTestClient;
@@ -126,6 +130,20 @@ class InmuebleHandlerTest {
     }
 
     @Test
+    void crearInmueble_cuandoOrdenFotosDuplicado_retorna400() {
+        webTestClient.post().uri(URL)
+                .header(GlobalErrorHandler.USER_ID_HEADER, "usr_01HX9Z")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(buildRequestWithField("fotos",
+                        "[{\"url\": \"https://cdn.arriendofacil.co/foto1.jpg\", \"order\": 1},"
+                        + "{\"url\": \"https://cdn.arriendofacil.co/foto2.jpg\", \"order\": 1}]"))
+                .exchange()
+                .expectStatus().isBadRequest()
+                .expectBody()
+                .jsonPath("$.errorCode").isEqualTo("VALIDATION_ERROR");
+    }
+
+    @Test
     void crearInmueble_cuandoPlanLimiteSuperado_retorna403() {
         when(crearInmuebleUseCase.execute(any(), any()))
                 .thenReturn(Mono.error(new ForbiddenException("LIMIT_EXCEEDED",
@@ -196,22 +214,26 @@ class InmuebleHandlerTest {
                 """;
     }
 
-    private static String buildRequestWithField(String field, String value) {
-        return """
-                {
-                    "title": "Apartamento moderno en El Poblado",
-                    "description": "Amplio apartamento de 2 habitaciones con vista a la ciudad.",
-                    "squareMeters": 75.5,
-                    "price": 1500000,
-                    "businessType": "RENT",
-                    "propertyType": "APARTMENT",
-                    "department": "Antioquia",
-                    "country": "Colombia",
-                    "city": "Medellín",
-                    "fullAddress": "Calle 10 # 43E-50, El Poblado",
-                    "%s": %s
-                }
-                """.formatted(field, value);
+    private static String buildRequestWithField(String field, String jsonValue) {
+        try {
+            ObjectNode node = TEST_MAPPER.createObjectNode();
+            node.put("title", "Apartamento moderno en El Poblado");
+            node.put("description", "Amplio apartamento de 2 habitaciones con vista a la ciudad.");
+            node.put("squareMeters", 75.5);
+            node.put("price", 1500000);
+            node.put("businessType", "RENT");
+            node.put("propertyType", "APARTMENT");
+            node.put("department", "Antioquia");
+            node.put("country", "Colombia");
+            node.put("city", "Medellín");
+            node.put("fullAddress", "Calle 10 # 43E-50, El Poblado");
+            node.set("fotos", TEST_MAPPER.readTree(
+                    "[{\"url\": \"https://cdn.arriendofacil.co/fotos/sala.jpg\", \"order\": 1}]"));
+            node.set(field, TEST_MAPPER.readTree(jsonValue));
+            return TEST_MAPPER.writeValueAsString(node);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private static InmuebleConFotos buildInmuebleConFotos() {

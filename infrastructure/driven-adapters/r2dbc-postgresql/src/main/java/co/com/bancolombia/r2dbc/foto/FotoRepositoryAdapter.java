@@ -23,12 +23,7 @@ public class FotoRepositoryAdapter implements FotoRepository {
     @Override
     public Flux<Foto> saveAll(List<Foto> fotos) {
         return r2dbcRepository.saveAll(fotos.stream().map(mapper::toEntity).toList())
-                .map(mapper::toDomain)
-                .retryWhen(Retry.fixedDelay(2, Duration.ofMillis(200))
-                        .filter(ex -> ex instanceof TransientDataAccessException)
-                        .doBeforeRetry(signal -> log.warn(
-                                "[FotoRepository] Reintento #{} en saveAll() — causa: {}",
-                                signal.totalRetries() + 1, signal.failure().getMessage())));
+                .map(mapper::toDomain);
     }
 
     @Override

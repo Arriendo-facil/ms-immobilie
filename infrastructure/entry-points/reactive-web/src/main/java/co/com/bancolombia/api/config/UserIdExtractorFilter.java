@@ -9,7 +9,7 @@ import reactor.core.publisher.Mono;
 import reactor.util.context.Context;
 
 @Component
-@Order(-1)
+@Order(2)
 public class UserIdExtractorFilter implements WebFilter {
 
     public static final String CTX_USER_ID = "userId";

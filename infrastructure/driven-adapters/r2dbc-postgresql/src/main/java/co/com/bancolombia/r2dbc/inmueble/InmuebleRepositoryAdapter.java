@@ -33,13 +33,13 @@ public class InmuebleRepositoryAdapter implements InmuebleRepository {
     }
 
     @Override
-    public Mono<Long> countActiveByUserId(String userId) {
+    public Mono<Long> countVigentesByUserId(String userId) {
         return r2dbcRepository.countByUserIdAndStatusIn(userId,
                         List.of(InmuebleStatus.ACTIVE.name(), InmuebleStatus.INACTIVE.name(), InmuebleStatus.PAUSED.name()))
                 .retryWhen(Retry.fixedDelay(2, Duration.ofMillis(150))
                         .filter(ex -> ex instanceof TransientDataAccessException)
                         .doBeforeRetry(signal -> log.warn(
-                                "[InmuebleRepository] Reintento #{} en countActiveByUserId() — causa: {}",
+                                "[InmuebleRepository] Reintento #{} en countVigentesByUserId() — causa: {}",
                                 signal.totalRetries() + 1, signal.failure().getMessage())));
     }
 }

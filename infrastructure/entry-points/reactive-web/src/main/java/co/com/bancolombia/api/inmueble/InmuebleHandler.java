@@ -4,6 +4,7 @@ import co.com.bancolombia.api.config.UserIdExtractorFilter;
 import co.com.bancolombia.api.dto.inmueble.CreateInmuebleDto;
 import co.com.bancolombia.api.mapper.InmuebleApiMapper;
 import co.com.bancolombia.model.exception.UnauthorizedException;
+import co.com.bancolombia.model.exception.ValidationException;
 import co.com.bancolombia.usecase.crearInmueble.CrearInmuebleUseCase;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
@@ -38,6 +39,7 @@ public class InmuebleHandler {
             log.info("[CREATE_INMUEBLE] userId={} - iniciando creación de inmueble", userId);
             return request.bodyToMono(CreateInmuebleDto.class)
                     .doOnNext(this::validate)
+                    .doOnNext(this::validateFotoOrders)
                     .flatMap(dto -> crearInmuebleUseCase.execute(mapper.toInmueble(dto, userId), mapper.toFotos(dto.fotos())))
                     .doOnSuccess(result -> log.info("[CREATE_INMUEBLE] userId={} - inmueble creado id={}", userId, result.inmueble().getId()))
                     .flatMap(result -> ServerResponse
@@ -51,6 +53,15 @@ public class InmuebleHandler {
         Set<ConstraintViolation<Object>> violations = validator.validate(body);
         if (!violations.isEmpty()) {
             throw new ConstraintViolationException(violations);
+        }
+    }
+
+    private void validateFotoOrders(CreateInmuebleDto dto) {
+        if (dto.fotos() == null) return;
+        long distinctOrders = dto.fotos().stream().map(foto -> foto.order()).distinct().count();
+        if (distinctOrders < dto.fotos().size()) {
+            throw new ValidationException("VALIDATION_ERROR",
+                    "Los valores de 'order' en las fotos deben ser únicos");
         }
     }
 }

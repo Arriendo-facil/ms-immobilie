@@ -87,7 +87,7 @@ class CrearInmuebleUseCaseTest {
         userDataBase = Map.of("id", USER_ID, "name", "Juan Pérez", "email", "juan@example.com");
 
         // Stubs del happy path por defecto
-        when(inmuebleRepository.countActiveByUserId(USER_ID)).thenReturn(Mono.just(0L));
+        when(inmuebleRepository.countVigentesByUserId(USER_ID)).thenReturn(Mono.just(0L));
         when(inmuebleRepository.save(any(Inmueble.class))).thenAnswer(invocation -> {
             Inmueble arg = invocation.getArgument(0);
             return Mono.just(arg);
@@ -106,7 +106,7 @@ class CrearInmuebleUseCaseTest {
 
     @Test
     void execute_whenCountBelowLimit_returnsInmuebleConFotos() {
-        when(inmuebleRepository.countActiveByUserId(USER_ID)).thenReturn(Mono.just(0L));
+        when(inmuebleRepository.countVigentesByUserId(USER_ID)).thenReturn(Mono.just(0L));
 
         StepVerifier.create(useCase.execute(inmuebleBase, fotosBase))
                 .assertNext(result -> {
@@ -120,7 +120,7 @@ class CrearInmuebleUseCaseTest {
 
     @Test
     void execute_whenCountAtLimit_minusOne_returnsInmuebleConFotos() {
-        when(inmuebleRepository.countActiveByUserId(USER_ID)).thenReturn(Mono.just(1L));
+        when(inmuebleRepository.countVigentesByUserId(USER_ID)).thenReturn(Mono.just(1L));
 
         StepVerifier.create(useCase.execute(inmuebleBase, fotosBase))
                 .assertNext(result -> {
@@ -264,7 +264,7 @@ class CrearInmuebleUseCaseTest {
 
     @Test
     void execute_whenCountEqualsLimit_throwsForbiddenException() {
-        when(inmuebleRepository.countActiveByUserId(USER_ID)).thenReturn(Mono.just(2L));
+        when(inmuebleRepository.countVigentesByUserId(USER_ID)).thenReturn(Mono.just(2L));
 
         StepVerifier.create(useCase.execute(inmuebleBase, fotosBase))
                 .expectErrorSatisfies(error -> {
@@ -277,7 +277,7 @@ class CrearInmuebleUseCaseTest {
 
     @Test
     void execute_whenCountExceedsLimit_throwsForbiddenException() {
-        when(inmuebleRepository.countActiveByUserId(USER_ID)).thenReturn(Mono.just(5L));
+        when(inmuebleRepository.countVigentesByUserId(USER_ID)).thenReturn(Mono.just(5L));
 
         StepVerifier.create(useCase.execute(inmuebleBase, fotosBase))
                 .expectErrorSatisfies(error -> {
@@ -285,7 +285,7 @@ class CrearInmuebleUseCaseTest {
                     assertThat(((ForbiddenException) error).getErrorCode())
                             .isEqualTo("PLAN_LIMIT_EXCEEDED");
                     assertThat(error.getMessage())
-                            .isEqualTo("Plan gratuito, maximo 2 propiedades activas permitidas");
+                            .isEqualTo("Plan gratuito, maximo 2 propiedades vigentes permitidas");
                 })
                 .verify();
     }
@@ -322,12 +322,24 @@ class CrearInmuebleUseCaseTest {
 
     @Test
     void execute_whenPlanLimitExceeded_doesNotCallSave() {
-        when(inmuebleRepository.countActiveByUserId(USER_ID)).thenReturn(Mono.just(2L));
+        when(inmuebleRepository.countVigentesByUserId(USER_ID)).thenReturn(Mono.just(2L));
 
         StepVerifier.create(useCase.execute(inmuebleBase, fotosBase))
                 .expectError(ForbiddenException.class)
                 .verify();
 
         verify(inmuebleRepository, never()).save(any(Inmueble.class));
+    }
+
+    @Test
+    void execute_whenUserClientFails_doesNotPersistAnything() {
+        when(userClient.findById(USER_ID)).thenReturn(Mono.error(new RuntimeException("ms-user unavailable")));
+
+        StepVerifier.create(useCase.execute(inmuebleBase, fotosBase))
+                .expectError(RuntimeException.class)
+                .verify();
+
+        verify(inmuebleRepository, never()).save(any(Inmueble.class));
+        verify(fotoRepository, never()).saveAll(anyList());
     }
 }

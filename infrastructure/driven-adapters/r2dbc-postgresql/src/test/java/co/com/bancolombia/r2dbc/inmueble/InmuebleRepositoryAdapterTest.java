@@ -164,15 +164,15 @@ class InmuebleRepositoryAdapterTest {
     }
 
     // -------------------------------------------------------------------------
-    // countActiveByUserId()
+    // countVigentesByUserId()
     // -------------------------------------------------------------------------
 
     @Test
-    void countActiveByUserId_passesCorrectStatuses() {
+    void countVigentesByUserId_passesCorrectStatuses() {
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<String>> statusCaptor = ArgumentCaptor.forClass(List.class);
 
-        StepVerifier.create(adapter.countActiveByUserId("user-abc"))
+        StepVerifier.create(adapter.countVigentesByUserId("user-abc"))
                 .expectNext(3L)
                 .verifyComplete();
 
@@ -182,17 +182,17 @@ class InmuebleRepositoryAdapterTest {
     }
 
     @Test
-    void countActiveByUserId_returnsCount() {
+    void countVigentesByUserId_returnsCount() {
         when(r2dbcRepository.countByUserIdAndStatusIn(eq("user-abc"), anyList()))
                 .thenReturn(Mono.just(7L));
 
-        StepVerifier.create(adapter.countActiveByUserId("user-abc"))
+        StepVerifier.create(adapter.countVigentesByUserId("user-abc"))
                 .expectNext(7L)
                 .verifyComplete();
     }
 
     @Test
-    void countActiveByUserId_retriesOnTransientException_succeedsOnThirdAttempt() {
+    void countVigentesByUserId_retriesOnTransientException_succeedsOnThirdAttempt() {
         AtomicInteger attempts = new AtomicInteger(0);
         TransientDataAccessException transientEx = new TransientDataAccessException("DB timeout") {};
 
@@ -203,7 +203,7 @@ class InmuebleRepositoryAdapterTest {
             return Mono.just(5L);
         });
 
-        StepVerifier.withVirtualTime(() -> adapter.countActiveByUserId("user-abc"))
+        StepVerifier.withVirtualTime(() -> adapter.countVigentesByUserId("user-abc"))
                 .thenAwait(Duration.ofSeconds(2))
                 .expectNext(5L)
                 .verifyComplete();
@@ -212,11 +212,11 @@ class InmuebleRepositoryAdapterTest {
     }
 
     @Test
-    void countActiveByUserId_doesNotRetryOnNonTransientException() {
+    void countVigentesByUserId_doesNotRetryOnNonTransientException() {
         when(r2dbcRepository.countByUserIdAndStatusIn(anyString(), anyList()))
                 .thenReturn(Mono.error(new RuntimeException("Query error")));
 
-        StepVerifier.create(adapter.countActiveByUserId("user-abc"))
+        StepVerifier.create(adapter.countVigentesByUserId("user-abc"))
                 .expectError(RuntimeException.class)
                 .verify();
 

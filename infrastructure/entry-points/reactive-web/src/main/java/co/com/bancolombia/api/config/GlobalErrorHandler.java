@@ -10,6 +10,7 @@ import co.com.bancolombia.model.exception.UnauthorizedException;
 import co.com.bancolombia.model.exception.ValidationException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.ConstraintViolationException;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;
 import org.springframework.core.io.buffer.DataBuffer;
@@ -27,11 +28,12 @@ import java.util.stream.Collectors;
 @Component
 @Order(-2)
 @Slf4j
+@RequiredArgsConstructor
 public class GlobalErrorHandler implements WebExceptionHandler {
 
     public static final String USER_ID_HEADER = "X-User-Id";
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper;
 
     @Override
     public Mono<Void> handle(ServerWebExchange exchange, Throwable ex) {
@@ -80,9 +82,17 @@ public class GlobalErrorHandler implements WebExceptionHandler {
         }
 
         String userId = exchange.getRequest().getHeaders().getFirst(USER_ID_HEADER);
-        String correlationId = exchange.getRequest().getHeaders().getFirst(RequestLoggingFilter.CORRELATION_ID_HEADER);
-        logError(ex, errorCode, message, exchange.getRequest().getPath().value(), userId, correlationId);
-        return writeResponse(exchange, status, new ErrorResponse(errorCode, message));
+        String path = exchange.getRequest().getPath().value();
+        HttpStatusCode resolvedStatus = status;
+        String resolvedErrorCode = errorCode;
+        String resolvedMessage = message;
+
+        return Mono.deferContextual(ctx -> {
+            String correlationId = ctx.<String>getOrEmpty(RequestLoggingFilter.CORRELATION_ID_HEADER)
+                    .orElseGet(() -> exchange.getRequest().getHeaders().getFirst(RequestLoggingFilter.CORRELATION_ID_HEADER));
+            logError(ex, resolvedErrorCode, resolvedMessage, path, userId, correlationId);
+            return writeResponse(exchange, resolvedStatus, new ErrorResponse(resolvedErrorCode, resolvedMessage));
+        });
     }
 
     private void logError(Throwable ex, String errorCode, String message, String path, String userId, String correlationId) {

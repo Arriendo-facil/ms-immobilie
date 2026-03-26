@@ -12,7 +12,7 @@ import reactor.util.context.Context;
 import java.util.UUID;
 
 @Component
-@Order(-2)
+@Order(1)
 @Slf4j
 public class RequestLoggingFilter implements WebFilter {
 

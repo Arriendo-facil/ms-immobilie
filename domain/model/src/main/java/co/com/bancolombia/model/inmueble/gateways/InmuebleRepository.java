@@ -5,5 +5,5 @@ import reactor.core.publisher.Mono;
 
 public interface InmuebleRepository {
     Mono<Inmueble> save(Inmueble inmueble);
-    Mono<Long> countActiveByUserId(String userId);
+    Mono<Long> countVigentesByUserId(String userId);
 }
