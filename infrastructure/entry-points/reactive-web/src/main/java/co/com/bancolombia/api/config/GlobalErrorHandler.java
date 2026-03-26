@@ -3,10 +3,14 @@ package co.com.bancolombia.api.config;
 import co.com.bancolombia.api.dto.common.ErrorResponse;
 import co.com.bancolombia.model.exception.ConflictException;
 import co.com.bancolombia.model.exception.DomainException;
+import co.com.bancolombia.model.exception.ExternalServiceException;
+import co.com.bancolombia.model.exception.ForbiddenException;
 import co.com.bancolombia.model.exception.NotFoundException;
+import co.com.bancolombia.model.exception.UnauthorizedException;
 import co.com.bancolombia.model.exception.ValidationException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.ConstraintViolationException;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;
 import org.springframework.core.io.buffer.DataBuffer;
@@ -24,8 +28,12 @@ import java.util.stream.Collectors;
 @Component
 @Order(-2)
 @Slf4j
+@RequiredArgsConstructor
 public class GlobalErrorHandler implements WebExceptionHandler {
-    private final ObjectMapper objectMapper = new ObjectMapper();
+
+    public static final String USER_ID_HEADER = "X-User-Id";
+
+    private final ObjectMapper objectMapper;
 
     @Override
     public Mono<Void> handle(ServerWebExchange exchange, Throwable ex) {
@@ -33,7 +41,19 @@ public class GlobalErrorHandler implements WebExceptionHandler {
         String errorCode;
         String message;
 
-        if (ex instanceof ConflictException e) {
+        if (ex instanceof UnauthorizedException e) {
+            status = HttpStatus.UNAUTHORIZED;
+            errorCode = e.getErrorCode();
+            message = e.getMessage();
+        } else if (ex instanceof ExternalServiceException e) {
+            status = HttpStatus.SERVICE_UNAVAILABLE;
+            errorCode = e.getErrorCode();
+            message = e.getMessage();
+        } else if (ex instanceof ForbiddenException e) {
+            status = HttpStatus.FORBIDDEN;
+            errorCode = e.getErrorCode();
+            message = e.getMessage();
+        } else if (ex instanceof ConflictException e) {
             status = HttpStatus.CONFLICT;
             errorCode = e.getErrorCode();
             message = e.getMessage();
@@ -61,15 +81,27 @@ public class GlobalErrorHandler implements WebExceptionHandler {
             message = "Error interno del servidor";
         }
 
-        logError(ex, errorCode, message, exchange.getRequest().getPath().value());
-        return writeResponse(exchange, status, new ErrorResponse(errorCode, message));
+        String userId = exchange.getRequest().getHeaders().getFirst(USER_ID_HEADER);
+        String path = exchange.getRequest().getPath().value();
+        HttpStatusCode resolvedStatus = status;
+        String resolvedErrorCode = errorCode;
+        String resolvedMessage = message;
+
+        return Mono.deferContextual(ctx -> {
+            String correlationId = ctx.<String>getOrEmpty(RequestLoggingFilter.CORRELATION_ID_HEADER)
+                    .orElseGet(() -> exchange.getRequest().getHeaders().getFirst(RequestLoggingFilter.CORRELATION_ID_HEADER));
+            logError(ex, resolvedErrorCode, resolvedMessage, path, userId, correlationId);
+            return writeResponse(exchange, resolvedStatus, new ErrorResponse(resolvedErrorCode, resolvedMessage));
+        });
     }
 
-    private void logError(Throwable ex, String errorCode, String message, String path) {
+    private void logError(Throwable ex, String errorCode, String message, String path, String userId, String correlationId) {
+        String user = userId != null ? userId : "anonymous";
+        String traceId = correlationId != null ? correlationId : "none";
         if (ex instanceof DomainException || ex instanceof ConstraintViolationException) {
-            log.warn("[{}] {} - path: {}", errorCode, message, path);
+            log.warn("[{}] userId={} correlationId={} {} - path: {}", errorCode, user, traceId, message, path);
         } else {
-            log.error("[{}] Error no controlado en path: {}", errorCode, path, ex);
+            log.error("[{}] userId={} correlationId={} Error no controlado en path: {}", errorCode, user, traceId, path, ex);
         }
     }
 

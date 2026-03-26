@@ -7,6 +7,37 @@ spring:
     add-properties: false
   profiles:
     include: null
+  cloud:
+    openfeign:
+      circuitbreaker:
+        enabled: true
+        # Con alphanumeric-ids, el nombre del CB para MsUserFeignClient#findById(String)
+        # será "MsUserFeignClientfindByIdString" (sin caracteres especiales)
+        alphanumeric-ids:
+          enabled: true
+    loadbalancer:
+      enabled: true
+      cache:
+        enabled: true
+        ttl: 35s
+      # Retry en otra instancia al activar Eureka
+      retry:
+        enabled: false
+
+# Eureka — descomentar cuando el eureka-server esté activo y agregar la dependencia en build.gradle
+# eureka:
+#   client:
+#     serviceUrl:
+#       defaultZone: ${EUREKA_URL:http://localhost:8761/eureka/}
+#     healthcheck:
+#       enabled: true
+#     registry-fetch-interval-seconds: 30
+#   instance:
+#     prefer-ip-address: true
+#     lease-renewal-interval-in-seconds: 15
+#     lease-expiration-duration-in-seconds: 45
+#     instance-id: ${spring.application.name}:${random.value}
+
 management:
   endpoints:
     web:
@@ -16,18 +47,96 @@ management:
     health:
       probes:
         enabled: true
+  health:
+    circuitbreakers:
+      enabled: true
+
 cors:
   allowed-origins: "http://localhost:4200,http://localhost:8080"
 
+# Reactive Commons — configuración del dominio 'app' para el bus de eventos (RabbitMQ)
+# El prefijo correcto es app.async.<domain-name>  (AsyncRabbitPropsDomainProperties usa @ConfigurationProperties(prefix = "app.async"))
+# El dominio 'app' es el DEFAULT_DOMAIN requerido por GenericAsyncPropsDomain
+app:
+  async:
+    app:
+      listenReplies: false
+      createTopology: true
+      connectionProperties:
+        host: ${RABBIT_HOST:localhost}
+        port: ${RABBIT_PORT:5672}
+        username: ${RABBIT_USER:guest}
+        password: ${RABBIT_PASSWORD:guest}
+        virtual-host: ${RABBIT_VHOST:/}
+
 adapters:
   postgresql:
-    host: localhost
+    host: "localhost"
     port: 5432
-    database: ms_immobilie
-    schema: public
-    username: postgres
-    password: postgres
+    database: "ms_immobilie"
+    schema: "public"
+    username: "postgres"
+    password: "postgres"
 
 springdoc:
   use-fn-handler-mapping: true
-  packages-to-scan: co.com.bancolombia
+  packages-to-scan: "co.com.bancolombia"
+
+adapter:
+  restconsumer:
+    timeout: 5000
+
+# URL de ms-user para desarrollo local (sin Eureka).
+# Cuando Eureka esté activo, eliminar este bloque Y el atributo url= de @FeignClient.
+clients:
+  ms-user:
+    url: ${MS_USER_URL:http://localhost:8081}
+
+resilience4j:
+  circuitbreaker:
+    configs:
+      # Perfil base para llamadas a microservicios externos
+      http-default:
+        registerHealthIndicator: true
+        slidingWindowType: COUNT_BASED
+        slidingWindowSize: 20
+        minimumNumberOfCalls: 10
+        failureRateThreshold: 50
+        slowCallRateThreshold: 80
+        slowCallDurationThreshold: "3s"
+        waitDurationInOpenState: "15s"
+        permittedNumberOfCallsInHalfOpenState: 5
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+    instances:
+      # Instancia para MsUserFeignClient#findById(String) con alphanumeric-ids habilitado
+      MsUserFeignClientfindByIdString:
+        baseConfig: http-default
+
+  timelimiter:
+    configs:
+      http-default:
+        timeoutDuration: "5s"
+        cancelRunningFuture: true
+    instances:
+      MsUserFeignClientfindByIdString:
+        baseConfig: http-default
+        timeoutDuration: "4s"
+
+  retry:
+    configs:
+      http-default:
+        maxAttempts: 3
+        waitDuration: "500ms"
+        enableExponentialBackoff: true
+        exponentialBackoffMultiplier: 2
+        exponentialMaxWaitDuration: "5s"
+        retryExceptions:
+          - feign.RetryableException
+          - java.net.ConnectException
+          - java.util.concurrent.TimeoutException
+        ignoreExceptions:
+          - co.com.bancolombia.model.exception.DomainException
+    instances:
+      MsUserFeignClientfindByIdString:
+        baseConfig: http-default
+        maxAttempts: 2
