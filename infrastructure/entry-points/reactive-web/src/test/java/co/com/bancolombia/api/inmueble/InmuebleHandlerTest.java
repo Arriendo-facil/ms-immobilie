@@ -5,7 +5,6 @@ import co.com.bancolombia.api.config.UserIdExtractorFilter;
 import co.com.bancolombia.api.mapper.InmuebleApiMapperImpl;
 import co.com.bancolombia.model.exception.ExternalServiceException;
 import co.com.bancolombia.model.exception.ForbiddenException;
-import co.com.bancolombia.model.exception.UnauthorizedException;
 import co.com.bancolombia.model.foto.Foto;
 import co.com.bancolombia.model.inmueble.BusinessType;
 import co.com.bancolombia.model.inmueble.Inmueble;
@@ -16,12 +15,14 @@ import co.com.bancolombia.usecase.crearInmueble.CrearInmuebleUseCase;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import jakarta.validation.Validation;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.reactive.WebFluxTest;
-import org.springframework.context.annotation.Import;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.reactive.server.MockServerConfigurer;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import reactor.core.publisher.Mono;
 
@@ -32,19 +33,38 @@ import java.util.List;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
-@WebFluxTest
-@Import({InmuebleRouter.class, InmuebleHandler.class, InmuebleApiMapperImpl.class,
-        GlobalErrorHandler.class, UserIdExtractorFilter.class})
+@ExtendWith(MockitoExtension.class)
 class InmuebleHandlerTest {
 
     private static final String URL = "/api/v1/inmuebles";
     private static final ObjectMapper TEST_MAPPER = new ObjectMapper();
 
-    @Autowired
+    @Mock
+    private CrearInmuebleUseCase crearInmuebleUseCase;
+
     private WebTestClient webTestClient;
 
-    @MockitoBean
-    private CrearInmuebleUseCase crearInmuebleUseCase;
+    @BeforeEach
+    void setUp() {
+        var mapper = new InmuebleApiMapperImpl();
+        var validator = Validation.buildDefaultValidatorFactory().getValidator();
+        var handler = new InmuebleHandler(crearInmuebleUseCase, mapper, validator);
+        var routerFunction = new InmuebleRouter().inmuebleRoutes(handler);
+
+        var errorHandler = new GlobalErrorHandler();
+
+        webTestClient = WebTestClient
+                .bindToRouterFunction(routerFunction)
+                .webFilter(new UserIdExtractorFilter())
+                .apply(new MockServerConfigurer() {
+                    @Override
+                    public void beforeServerCreated(
+                            org.springframework.web.server.adapter.WebHttpHandlerBuilder builder) {
+                        builder.exceptionHandler(errorHandler);
+                    }
+                })
+                .build();
+    }
 
     @Test
     void crearInmueble_cuandoBodyValido_retorna201ConInmuebleCreado() {

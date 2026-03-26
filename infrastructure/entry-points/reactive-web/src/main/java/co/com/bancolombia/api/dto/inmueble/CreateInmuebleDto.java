@@ -13,7 +13,7 @@ import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.util.List;
 
-@Schema(description = "Datos para publicar un nuevo inmueble")
+@Schema(description = "Datos para publicar un nuevo inmueble. El propietario se identifica mediante el header `X-User-Id` propagado por el API Gateway — no se incluye en el body.")
 public record CreateInmuebleDto(
         @Schema(description = "Título del aviso (entre 5 y 150 caracteres)", example = "Apartamento moderno en El Poblado", requiredMode = Schema.RequiredMode.REQUIRED)
         @NotBlank(message = "El título es obligatorio")
