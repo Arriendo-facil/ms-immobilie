@@ -168,11 +168,11 @@ class InmuebleRepositoryAdapterTest {
     // -------------------------------------------------------------------------
 
     @Test
-    void countVigentesByUserId_passesCorrectStatuses() {
+    void countCurrentByUserId_passesCorrectStatuses() {
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<String>> statusCaptor = ArgumentCaptor.forClass(List.class);
 
-        StepVerifier.create(adapter.countVigentesByUserId("user-abc"))
+        StepVerifier.create(adapter.countCurrentByUserId("user-abc"))
                 .expectNext(3L)
                 .verifyComplete();
 
@@ -186,13 +186,13 @@ class InmuebleRepositoryAdapterTest {
         when(r2dbcRepository.countByUserIdAndStatusIn(eq("user-abc"), anyList()))
                 .thenReturn(Mono.just(7L));
 
-        StepVerifier.create(adapter.countVigentesByUserId("user-abc"))
+        StepVerifier.create(adapter.countCurrentByUserId("user-abc"))
                 .expectNext(7L)
                 .verifyComplete();
     }
 
     @Test
-    void countVigentesByUserId_retriesOnTransientException_succeedsOnThirdAttempt() {
+    void countCurrentByUserId_retriesOnTransientException_succeedsOnThirdAttempt() {
         AtomicInteger attempts = new AtomicInteger(0);
         TransientDataAccessException transientEx = new TransientDataAccessException("DB timeout") {};
 
@@ -203,7 +203,7 @@ class InmuebleRepositoryAdapterTest {
             return Mono.just(5L);
         });
 
-        StepVerifier.withVirtualTime(() -> adapter.countVigentesByUserId("user-abc"))
+        StepVerifier.withVirtualTime(() -> adapter.countCurrentByUserId("user-abc"))
                 .thenAwait(Duration.ofSeconds(2))
                 .expectNext(5L)
                 .verifyComplete();
@@ -212,11 +212,11 @@ class InmuebleRepositoryAdapterTest {
     }
 
     @Test
-    void countVigentesByUserId_doesNotRetryOnNonTransientException() {
+    void countCurrentByUserId_doesNotRetryOnNonTransientException() {
         when(r2dbcRepository.countByUserIdAndStatusIn(anyString(), anyList()))
                 .thenReturn(Mono.error(new RuntimeException("Query error")));
 
-        StepVerifier.create(adapter.countVigentesByUserId("user-abc"))
+        StepVerifier.create(adapter.countCurrentByUserId("user-abc"))
                 .expectError(RuntimeException.class)
                 .verify();
 

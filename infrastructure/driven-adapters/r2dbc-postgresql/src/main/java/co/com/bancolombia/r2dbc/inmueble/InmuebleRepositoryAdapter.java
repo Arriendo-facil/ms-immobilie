@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.TransientDataAccessException;
 import org.springframework.stereotype.Repository;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.util.retry.Retry;
 
@@ -33,7 +34,7 @@ public class InmuebleRepositoryAdapter implements InmuebleRepository {
     }
 
     @Override
-    public Mono<Long> countVigentesByUserId(String userId) {
+    public Mono<Long> countCurrentByUserId(String userId) {
         return r2dbcRepository.countByUserIdAndStatusIn(userId,
                         List.of(InmuebleStatus.ACTIVE.name(), InmuebleStatus.INACTIVE.name(), InmuebleStatus.PAUSED.name()))
                 .retryWhen(Retry.fixedDelay(2, Duration.ofMillis(150))
@@ -41,5 +42,19 @@ public class InmuebleRepositoryAdapter implements InmuebleRepository {
                         .doBeforeRetry(signal -> log.warn(
                                 "[InmuebleRepository] Reintento #{} en countVigentesByUserId() — causa: {}",
                                 signal.totalRetries() + 1, signal.failure().getMessage())));
+    }
+
+    @Override
+    public Flux<Inmueble> findAllByUserId(String userId) {
+        return r2dbcRepository.findAllByUserId(userId)
+                .map(mapper::toDomain)
+                .retryWhen(Retry.fixedDelay(2, Duration.ofMillis(150))
+                        .filter(ex -> ex instanceof TransientDataAccessException)
+                        .doBeforeRetry(signal -> log.warn(
+                                "[InmuebleRepository] Reintento #{} en findAllByUserId() — causa: {}",
+                                signal.totalRetries() + 1, signal.failure().getMessage()
+                        ))
+                );
+
     }
 }

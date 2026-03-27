@@ -11,7 +11,7 @@ import co.com.bancolombia.model.inmueble.Inmueble;
 import co.com.bancolombia.model.inmueble.InmuebleConFotos;
 import co.com.bancolombia.model.inmueble.InmuebleStatus;
 import co.com.bancolombia.model.inmueble.PropertyType;
-import co.com.bancolombia.usecase.crearInmueble.CrearInmuebleUseCase;
+import co.com.bancolombia.usecase.inmueble.CrearInmuebleUseCase;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
