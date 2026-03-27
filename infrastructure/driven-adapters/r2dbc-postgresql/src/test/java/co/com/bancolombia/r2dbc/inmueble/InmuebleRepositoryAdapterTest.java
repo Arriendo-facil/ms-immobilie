@@ -13,11 +13,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.dao.TransientDataAccessException;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
 import java.math.BigDecimal;
-import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -119,22 +119,22 @@ class InmuebleRepositoryAdapterTest {
 
     @Test
     void save_retriesOnTransientException_succeedsOnThirdAttempt() {
-        AtomicInteger attempts = new AtomicInteger(0);
+        AtomicInteger subscriptions = new AtomicInteger(0);
         TransientDataAccessException transientEx = new TransientDataAccessException("DB timeout") {};
 
-        when(r2dbcRepository.save(inmuebleEntity)).thenAnswer(inv -> {
-            if (attempts.incrementAndGet() <= 2) {
-                return Mono.error(transientEx);
-            }
-            return Mono.just(inmuebleEntity);
-        });
+        // Mono.defer evalúa el lambda en cada re-suscripción (no en la llamada al método)
+        when(r2dbcRepository.save(inmuebleEntity)).thenReturn(
+                Mono.defer(() -> subscriptions.incrementAndGet() <= 2
+                        ? Mono.error(transientEx)
+                        : Mono.just(inmuebleEntity))
+        );
 
-        StepVerifier.withVirtualTime(() -> adapter.save(inmuebleDomain))
-                .thenAwait(Duration.ofSeconds(2))
+        StepVerifier.create(adapter.save(inmuebleDomain))
                 .assertNext(result -> assertThat(result.getId()).isEqualTo("prop-123"))
                 .verifyComplete();
 
-        verify(r2dbcRepository, times(3)).save(inmuebleEntity);
+        verify(r2dbcRepository, times(1)).save(inmuebleEntity); // método llamado 1 vez (assembly time)
+        assertThat(subscriptions.get()).isEqualTo(3);           // re-suscripto 3 veces
     }
 
     @Test
@@ -154,13 +154,12 @@ class InmuebleRepositoryAdapterTest {
         TransientDataAccessException transientEx = new TransientDataAccessException("DB timeout") {};
         when(r2dbcRepository.save(inmuebleEntity)).thenReturn(Mono.error(transientEx));
 
-        StepVerifier.withVirtualTime(() -> adapter.save(inmuebleDomain))
-                .thenAwait(Duration.ofSeconds(2))
-                .expectError()
+        // Retries exhausted → la causa del error final es la excepción transitoria original
+        StepVerifier.create(adapter.save(inmuebleDomain))
+                .expectErrorSatisfies(ex -> assertThat(ex).hasCauseInstanceOf(TransientDataAccessException.class))
                 .verify();
 
-        // 1 intento inicial + 2 reintentos = 3 llamadas totales
-        verify(r2dbcRepository, times(3)).save(inmuebleEntity);
+        verify(r2dbcRepository, times(1)).save(inmuebleEntity); // método llamado 1 vez (assembly time)
     }
 
     // -------------------------------------------------------------------------
@@ -193,22 +192,21 @@ class InmuebleRepositoryAdapterTest {
 
     @Test
     void countCurrentByUserId_retriesOnTransientException_succeedsOnThirdAttempt() {
-        AtomicInteger attempts = new AtomicInteger(0);
+        AtomicInteger subscriptions = new AtomicInteger(0);
         TransientDataAccessException transientEx = new TransientDataAccessException("DB timeout") {};
 
-        when(r2dbcRepository.countByUserIdAndStatusIn(anyString(), anyList())).thenAnswer(inv -> {
-            if (attempts.incrementAndGet() <= 2) {
-                return Mono.error(transientEx);
-            }
-            return Mono.just(5L);
-        });
+        when(r2dbcRepository.countByUserIdAndStatusIn(anyString(), anyList())).thenReturn(
+                Mono.defer(() -> subscriptions.incrementAndGet() <= 2
+                        ? Mono.error(transientEx)
+                        : Mono.just(5L))
+        );
 
-        StepVerifier.withVirtualTime(() -> adapter.countCurrentByUserId("user-abc"))
-                .thenAwait(Duration.ofSeconds(2))
+        StepVerifier.create(adapter.countCurrentByUserId("user-abc"))
                 .expectNext(5L)
                 .verifyComplete();
 
-        verify(r2dbcRepository, times(3)).countByUserIdAndStatusIn(anyString(), anyList());
+        verify(r2dbcRepository, times(1)).countByUserIdAndStatusIn(anyString(), anyList());
+        assertThat(subscriptions.get()).isEqualTo(3);
     }
 
     @Test
@@ -221,5 +219,86 @@ class InmuebleRepositoryAdapterTest {
                 .verify();
 
         verify(r2dbcRepository, times(1)).countByUserIdAndStatusIn(anyString(), anyList());
+    }
+
+    // -------------------------------------------------------------------------
+    // findAllByUserId()
+    // -------------------------------------------------------------------------
+
+    @Test
+    void findAllByUserId_happyPath_returnsMappedInmuebles() {
+        LocalDateTime now = LocalDateTime.of(2026, 3, 25, 10, 0);
+        InmuebleEntity entity2 = InmuebleEntity.builder()
+                .id("prop-456").version(0L).userId("user-abc").title("Casa en El Poblado")
+                .description("Casa con jardín").squareMeters(new BigDecimal("200.00"))
+                .price(new BigDecimal("3000000")).businessType("RENT").propertyType("HOUSE")
+                .status("ACTIVE").department("Antioquia").country("Colombia").city("Medellín")
+                .fullAddress("Carrera 43A # 1-50").publishedAt(now).expiresAt(now.plusDays(30))
+                .createdAt(now).updatedAt(now).build();
+        Inmueble domain2 = inmuebleDomain.toBuilder().id("prop-456").build();
+
+        when(r2dbcRepository.findAllByUserId("user-abc")).thenReturn(Flux.just(inmuebleEntity, entity2));
+        when(mapper.toDomain(entity2)).thenReturn(domain2);
+
+        StepVerifier.create(adapter.findAllByUserId("user-abc"))
+                .assertNext(result -> assertThat(result.getId()).isEqualTo("prop-123"))
+                .assertNext(result -> assertThat(result.getId()).isEqualTo("prop-456"))
+                .verifyComplete();
+
+        verify(r2dbcRepository).findAllByUserId("user-abc");
+        verify(mapper, times(2)).toDomain(org.mockito.ArgumentMatchers.any(InmuebleEntity.class));
+    }
+
+    @Test
+    void findAllByUserId_whenNoInmuebles_returnsEmptyFlux() {
+        when(r2dbcRepository.findAllByUserId("user-abc")).thenReturn(Flux.empty());
+
+        StepVerifier.create(adapter.findAllByUserId("user-abc"))
+                .verifyComplete();
+
+        verify(r2dbcRepository).findAllByUserId("user-abc");
+    }
+
+    @Test
+    void findAllByUserId_retriesOnTransientException_succeedsOnThirdAttempt() {
+        AtomicInteger subscriptions = new AtomicInteger(0);
+        TransientDataAccessException transientEx = new TransientDataAccessException("DB timeout") {};
+
+        when(r2dbcRepository.findAllByUserId("user-abc")).thenReturn(
+                Flux.defer(() -> subscriptions.incrementAndGet() <= 2
+                        ? Flux.error(transientEx)
+                        : Flux.just(inmuebleEntity))
+        );
+
+        StepVerifier.create(adapter.findAllByUserId("user-abc"))
+                .assertNext(result -> assertThat(result.getId()).isEqualTo("prop-123"))
+                .verifyComplete();
+
+        verify(r2dbcRepository, times(1)).findAllByUserId("user-abc");
+        assertThat(subscriptions.get()).isEqualTo(3);
+    }
+
+    @Test
+    void findAllByUserId_doesNotRetryOnNonTransientException() {
+        when(r2dbcRepository.findAllByUserId("user-abc"))
+                .thenReturn(Flux.error(new RuntimeException("Query error")));
+
+        StepVerifier.create(adapter.findAllByUserId("user-abc"))
+                .expectError(RuntimeException.class)
+                .verify();
+
+        verify(r2dbcRepository, times(1)).findAllByUserId("user-abc");
+    }
+
+    @Test
+    void findAllByUserId_propagatesErrorAfterRetryExhausted() {
+        TransientDataAccessException transientEx = new TransientDataAccessException("DB timeout") {};
+        when(r2dbcRepository.findAllByUserId("user-abc")).thenReturn(Flux.error(transientEx));
+
+        StepVerifier.create(adapter.findAllByUserId("user-abc"))
+                .expectErrorSatisfies(ex -> assertThat(ex).hasCauseInstanceOf(TransientDataAccessException.class))
+                .verify();
+
+        verify(r2dbcRepository, times(1)).findAllByUserId("user-abc");
     }
 }

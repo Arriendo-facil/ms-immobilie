@@ -12,7 +12,6 @@ import org.springframework.dao.TransientDataAccessException;
 import reactor.core.publisher.Flux;
 import reactor.test.StepVerifier;
 
-import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -90,24 +89,15 @@ class FotoRepositoryAdapterTest {
     }
 
     @Test
-    void saveAll_retriesOnTransientException_succeedsOnThirdAttempt() {
-        AtomicInteger attempts = new AtomicInteger(0);
+    void saveAll_propagatesErrorWithoutRetry() {
         TransientDataAccessException transientEx = new TransientDataAccessException("DB timeout") {};
+        when(r2dbcRepository.saveAll(any(Iterable.class))).thenReturn(Flux.error(transientEx));
 
-        when(r2dbcRepository.saveAll(any(Iterable.class))).thenAnswer(inv -> {
-            if (attempts.incrementAndGet() <= 2) {
-                return Flux.error(transientEx);
-            }
-            return Flux.just(foto1Entity, foto2Entity);
-        });
+        StepVerifier.create(adapter.saveAll(List.of(foto1Domain, foto2Domain)))
+                .expectError(TransientDataAccessException.class)
+                .verify();
 
-        StepVerifier.withVirtualTime(() -> adapter.saveAll(List.of(foto1Domain, foto2Domain)))
-                .thenAwait(Duration.ofSeconds(2))
-                .assertNext(f -> assertThat(f.getId()).isEqualTo("foto-001"))
-                .assertNext(f -> assertThat(f.getId()).isEqualTo("foto-002"))
-                .verifyComplete();
-
-        verify(r2dbcRepository, times(3)).saveAll(any(Iterable.class));
+        verify(r2dbcRepository, times(1)).saveAll(any(Iterable.class));
     }
 
     @Test
@@ -145,23 +135,22 @@ class FotoRepositoryAdapterTest {
 
     @Test
     void findByPropertyId_retriesOnTransientException_succeedsOnThirdAttempt() {
-        AtomicInteger attempts = new AtomicInteger(0);
+        AtomicInteger subscriptions = new AtomicInteger(0);
         TransientDataAccessException transientEx = new TransientDataAccessException("DB timeout") {};
 
-        when(r2dbcRepository.findByPropertyId(anyString())).thenAnswer(inv -> {
-            if (attempts.incrementAndGet() <= 2) {
-                return Flux.error(transientEx);
-            }
-            return Flux.just(foto1Entity, foto2Entity);
-        });
+        when(r2dbcRepository.findByPropertyId(anyString())).thenReturn(
+                Flux.defer(() -> subscriptions.incrementAndGet() <= 2
+                        ? Flux.error(transientEx)
+                        : Flux.just(foto1Entity, foto2Entity))
+        );
 
-        StepVerifier.withVirtualTime(() -> adapter.findByPropertyId("prop-123"))
-                .thenAwait(Duration.ofSeconds(2))
+        StepVerifier.create(adapter.findByPropertyId("prop-123"))
                 .assertNext(f -> assertThat(f.getId()).isEqualTo("foto-001"))
                 .assertNext(f -> assertThat(f.getId()).isEqualTo("foto-002"))
                 .verifyComplete();
 
-        verify(r2dbcRepository, times(3)).findByPropertyId("prop-123");
+        verify(r2dbcRepository, times(1)).findByPropertyId("prop-123");
+        assertThat(subscriptions.get()).isEqualTo(3);
     }
 
     @Test
