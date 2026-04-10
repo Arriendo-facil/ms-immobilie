@@ -1,4 +1,4 @@
-package co.com.bancolombia.usecase.crearInmueble;
+package co.com.bancolombia.usecase.inmueble;
 
 import co.com.bancolombia.model.events.InmuebleCreatedEvent;
 import co.com.bancolombia.model.events.gateways.EventsGateway;
@@ -87,7 +87,7 @@ class CrearInmuebleUseCaseTest {
         userDataBase = Map.of("id", USER_ID, "name", "Juan Pérez", "email", "juan@example.com");
 
         // Stubs del happy path por defecto
-        when(inmuebleRepository.countVigentesByUserId(USER_ID)).thenReturn(Mono.just(0L));
+        when(inmuebleRepository.countCurrentByUserId(USER_ID)).thenReturn(Mono.just(0L));
         when(inmuebleRepository.save(any(Inmueble.class))).thenAnswer(invocation -> {
             Inmueble arg = invocation.getArgument(0);
             return Mono.just(arg);
@@ -106,7 +106,7 @@ class CrearInmuebleUseCaseTest {
 
     @Test
     void execute_whenCountBelowLimit_returnsInmuebleConFotos() {
-        when(inmuebleRepository.countVigentesByUserId(USER_ID)).thenReturn(Mono.just(0L));
+        when(inmuebleRepository.countCurrentByUserId(USER_ID)).thenReturn(Mono.just(0L));
 
         StepVerifier.create(useCase.execute(inmuebleBase, fotosBase))
                 .assertNext(result -> {
@@ -120,7 +120,7 @@ class CrearInmuebleUseCaseTest {
 
     @Test
     void execute_whenCountAtLimit_minusOne_returnsInmuebleConFotos() {
-        when(inmuebleRepository.countVigentesByUserId(USER_ID)).thenReturn(Mono.just(1L));
+        when(inmuebleRepository.countCurrentByUserId(USER_ID)).thenReturn(Mono.just(1L));
 
         StepVerifier.create(useCase.execute(inmuebleBase, fotosBase))
                 .assertNext(result -> {
@@ -264,7 +264,7 @@ class CrearInmuebleUseCaseTest {
 
     @Test
     void execute_whenCountEqualsLimit_throwsForbiddenException() {
-        when(inmuebleRepository.countVigentesByUserId(USER_ID)).thenReturn(Mono.just(2L));
+        when(inmuebleRepository.countCurrentByUserId(USER_ID)).thenReturn(Mono.just(2L));
 
         StepVerifier.create(useCase.execute(inmuebleBase, fotosBase))
                 .expectErrorSatisfies(error -> {
@@ -277,7 +277,7 @@ class CrearInmuebleUseCaseTest {
 
     @Test
     void execute_whenCountExceedsLimit_throwsForbiddenException() {
-        when(inmuebleRepository.countVigentesByUserId(USER_ID)).thenReturn(Mono.just(5L));
+        when(inmuebleRepository.countCurrentByUserId(USER_ID)).thenReturn(Mono.just(5L));
 
         StepVerifier.create(useCase.execute(inmuebleBase, fotosBase))
                 .expectErrorSatisfies(error -> {
@@ -322,7 +322,7 @@ class CrearInmuebleUseCaseTest {
 
     @Test
     void execute_whenPlanLimitExceeded_doesNotCallSave() {
-        when(inmuebleRepository.countVigentesByUserId(USER_ID)).thenReturn(Mono.just(2L));
+        when(inmuebleRepository.countCurrentByUserId(USER_ID)).thenReturn(Mono.just(2L));
 
         StepVerifier.create(useCase.execute(inmuebleBase, fotosBase))
                 .expectError(ForbiddenException.class)

@@ -1,6 +1,5 @@
-package co.com.bancolombia.usecase.crearInmueble;
+package co.com.bancolombia.usecase.inmueble;
 
-import co.com.bancolombia.model.events.FotoPublicData;
 import co.com.bancolombia.model.events.InmuebleCreatedEvent;
 import co.com.bancolombia.model.events.InmueblePublicData;
 import co.com.bancolombia.model.events.gateways.EventsGateway;
@@ -39,7 +38,7 @@ public class CrearInmuebleUseCase {
     }
 
     private Mono<Void> checkPlanLimit(String userId) {
-        return inmuebleRepository.countVigentesByUserId(userId)
+        return inmuebleRepository.countCurrentByUserId(userId)
                 .flatMap(count -> count >= FREE_PLAN_MAX_PROPERTIES
                         ? Mono.error(new ForbiddenException(
                                 "PLAN_LIMIT_EXCEEDED",
@@ -70,32 +69,9 @@ public class CrearInmuebleUseCase {
     private Mono<InmuebleConFotos> emitEventAndReturn(Inmueble inmueble, List<Foto> photos, Map<String, Object> userData) {
         InmuebleCreatedEvent event = InmuebleCreatedEvent.builder()
                 .user(userData)
-                .inmueble(buildPublicData(inmueble, photos))
+                .inmueble(InmueblePublicData.from(inmueble, photos))
                 .build();
         return eventsGateway.emit(event)
                 .thenReturn(new InmuebleConFotos(inmueble, photos));
-    }
-
-    private InmueblePublicData buildPublicData(Inmueble inmueble, List<Foto> photos) {
-        return InmueblePublicData.builder()
-                .id(inmueble.getId())
-                .userId(inmueble.getUserId())
-                .title(inmueble.getTitle())
-                .description(inmueble.getDescription())
-                .squareMeters(inmueble.getSquareMeters())
-                .price(inmueble.getPrice())
-                .businessType(inmueble.getBusinessType())
-                .propertyType(inmueble.getPropertyType())
-                .department(inmueble.getDepartment())
-                .country(inmueble.getCountry())
-                .city(inmueble.getCity())
-                .photos(photos.stream()
-                        .map(photo -> FotoPublicData.builder()
-                                .id(photo.getId())
-                                .url(photo.getUrl())
-                                .order(photo.getOrder())
-                                .build())
-                        .toList())
-                .build();
     }
 }

@@ -11,7 +11,8 @@ import co.com.bancolombia.model.inmueble.Inmueble;
 import co.com.bancolombia.model.inmueble.InmuebleConFotos;
 import co.com.bancolombia.model.inmueble.InmuebleStatus;
 import co.com.bancolombia.model.inmueble.PropertyType;
-import co.com.bancolombia.usecase.crearInmueble.CrearInmuebleUseCase;
+import co.com.bancolombia.usecase.inmueble.CrearInmuebleUseCase;
+import co.com.bancolombia.usecase.inmueble.FindAllImobilieByUserUseCase;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -24,6 +25,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.MockServerConfigurer;
 import org.springframework.test.web.reactive.server.WebTestClient;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.math.BigDecimal;
@@ -42,13 +44,16 @@ class InmuebleHandlerTest {
     @Mock
     private CrearInmuebleUseCase crearInmuebleUseCase;
 
+    @Mock
+    private FindAllImobilieByUserUseCase findAllImobilieByUserUseCase;
+
     private WebTestClient webTestClient;
 
     @BeforeEach
     void setUp() {
         var mapper = new InmuebleApiMapperImpl();
         var validator = Validation.buildDefaultValidatorFactory().getValidator();
-        var handler = new InmuebleHandler(crearInmuebleUseCase, mapper, validator);
+        var handler = new InmuebleHandler(crearInmuebleUseCase, findAllImobilieByUserUseCase, mapper, validator);
         var routerFunction = new InmuebleRouter().inmuebleRoutes(handler);
 
         var errorHandler = new GlobalErrorHandler();
@@ -210,6 +215,92 @@ class InmuebleHandlerTest {
                 .expectStatus().is5xxServerError()
                 .expectBody()
                 .jsonPath("$.errorCode").isEqualTo("INTERNAL_ERROR");
+    }
+
+    // -------------------------------------------------------------------------
+    // GET /api/v1/inmuebles — getinmueblesByUser
+    // -------------------------------------------------------------------------
+
+    @Test
+    void getInmueblesByUser_cuandoHayInmuebles_retorna200ConLista() {
+        when(findAllImobilieByUserUseCase.execute("usr_01HX9Z"))
+                .thenReturn(Flux.just(buildInmuebleConFotos()));
+
+        webTestClient.get().uri(URL)
+                .header(GlobalErrorHandler.USER_ID_HEADER, "usr_01HX9Z")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$[0].id").isEqualTo("test-id")
+                .jsonPath("$[0].userId").isEqualTo("usr_01HX9Z")
+                .jsonPath("$[0].title").isEqualTo("Apartamento moderno en El Poblado")
+                .jsonPath("$[0].status").isEqualTo("ACTIVE")
+                .jsonPath("$[0].fotos[0].url").isEqualTo("https://cdn.arriendofacil.co/fotos/sala.jpg")
+                .jsonPath("$[0].fotos[0].order").isEqualTo(1);
+    }
+
+    @Test
+    void getInmueblesByUser_cuandoNoHayInmuebles_retorna200ConListaVacia() {
+        when(findAllImobilieByUserUseCase.execute("usr_01HX9Z"))
+                .thenReturn(Flux.empty());
+
+        webTestClient.get().uri(URL)
+                .header(GlobalErrorHandler.USER_ID_HEADER, "usr_01HX9Z")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$").isArray()
+                .jsonPath("$.length()").isEqualTo(0);
+    }
+
+    @Test
+    void getInmueblesByUser_cuandoFaltaHeaderUserId_retorna400() {
+        webTestClient.get().uri(URL)
+                .exchange()
+                .expectStatus().isBadRequest()
+                .expectBody()
+                .jsonPath("$.errorCode").isEqualTo("MISSING_USER_IDENTITY");
+    }
+
+    @Test
+    void getInmueblesByUser_cuandoUseCaseFalla_retorna500() {
+        when(findAllImobilieByUserUseCase.execute("usr_01HX9Z"))
+                .thenReturn(Flux.error(new RuntimeException("Error inesperado")));
+
+        webTestClient.get().uri(URL)
+                .header(GlobalErrorHandler.USER_ID_HEADER, "usr_01HX9Z")
+                .exchange()
+                .expectStatus().is5xxServerError()
+                .expectBody()
+                .jsonPath("$.errorCode").isEqualTo("INTERNAL_ERROR");
+    }
+
+    @Test
+    void getInmueblesByUser_cuandoHayMultiplesInmuebles_retornaTodosEnLista() {
+        var inmueble2 = new InmuebleConFotos(
+                Inmueble.builder()
+                        .id("test-id-2").userId("usr_01HX9Z")
+                        .title("Casa en Laureles").description("Casa amplia")
+                        .squareMeters(new BigDecimal("120.0")).price(new BigDecimal("2500000"))
+                        .businessType(BusinessType.RENT).propertyType(PropertyType.HOUSE)
+                        .status(InmuebleStatus.ACTIVE).department("Antioquia")
+                        .country("Colombia").city("Medellín").fullAddress("Calle 33 # 75-20")
+                        .publishedAt(LocalDateTime.now()).expiresAt(LocalDateTime.now().plusDays(30))
+                        .createdAt(LocalDateTime.now()).build(),
+                List.of()
+        );
+
+        when(findAllImobilieByUserUseCase.execute("usr_01HX9Z"))
+                .thenReturn(Flux.just(buildInmuebleConFotos(), inmueble2));
+
+        webTestClient.get().uri(URL)
+                .header(GlobalErrorHandler.USER_ID_HEADER, "usr_01HX9Z")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.length()").isEqualTo(2)
+                .jsonPath("$[0].id").isEqualTo("test-id")
+                .jsonPath("$[1].id").isEqualTo("test-id-2");
     }
 
     // --- helpers ---

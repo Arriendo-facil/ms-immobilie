@@ -6,6 +6,7 @@ import co.com.bancolombia.api.dto.inmueble.InmuebleResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
+import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.parameters.RequestBody;
@@ -21,8 +22,7 @@ import org.springframework.web.reactive.function.server.RouterFunction;
 import org.springframework.web.reactive.function.server.RouterFunctions;
 import org.springframework.web.reactive.function.server.ServerResponse;
 
-import static org.springframework.web.reactive.function.server.RequestPredicates.POST;
-import static org.springframework.web.reactive.function.server.RequestPredicates.accept;
+import static org.springframework.web.reactive.function.server.RequestPredicates.*;
 
 @Tag(name = "Inmuebles", description = "Operaciones para gestión de inmuebles en la plataforma Arriendo Fácil")
 @Configuration
@@ -31,6 +31,60 @@ public class InmuebleRouter {
     private static final String BASE_PATH = "/api/v1/inmuebles";
 
     @RouterOperations({
+        @RouterOperation(
+            path = BASE_PATH,
+            method = RequestMethod.GET,
+            beanClass = InmuebleHandler.class,
+            beanMethod = "getinmueblesByUser",
+            operation = @Operation(
+                operationId = "getInmueblesByUser",
+                summary = "Listar inmuebles propios",
+                description = """
+                    Retorna todos los inmuebles publicados por el usuario autenticado, incluyendo sus fotos.
+
+                    **Reglas de negocio:**
+                    - La identidad del propietario se extrae del header `X-User-Id`, propagado por el API Gateway. Si el header está ausente, se retorna `401 Unauthorized`.
+                    - Si el usuario no tiene inmuebles registrados, se retorna `200 OK` con una lista vacía `[]`.
+                    """,
+                tags = {"Inmuebles"},
+                parameters = {
+                    @Parameter(
+                        name = "X-User-Id",
+                        in = ParameterIn.HEADER,
+                        description = "Identificador del usuario propietario, propagado por el API Gateway. Requerido — su ausencia retorna 401.",
+                        required = true,
+                        example = "usr_01HX9Z",
+                        schema = @Schema(type = "string")
+                    )
+                },
+                responses = {
+                    @ApiResponse(
+                        responseCode = "200",
+                        description = "Lista de inmuebles del usuario con sus fotos. Retorna `[]` si no tiene inmuebles.",
+                        content = @Content(
+                            mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            array = @ArraySchema(schema = @Schema(implementation = InmuebleResponse.class))
+                        )
+                    ),
+                    @ApiResponse(
+                        responseCode = "401",
+                        description = "Header `X-User-Id` ausente o vacío — el API Gateway no propagó la identidad del usuario (errorCode: `MISSING_USER_IDENTITY`)",
+                        content = @Content(
+                            mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class)
+                        )
+                    ),
+                    @ApiResponse(
+                        responseCode = "500",
+                        description = "Error interno del servidor",
+                        content = @Content(
+                            mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class)
+                        )
+                    )
+                }
+            )
+        ),
         @RouterOperation(
             path = BASE_PATH,
             method = RequestMethod.POST,
@@ -126,8 +180,7 @@ public class InmuebleRouter {
     @Bean
     public RouterFunction<ServerResponse> inmuebleRoutes(InmuebleHandler handler) {
         return RouterFunctions.route(
-            POST(BASE_PATH).and(accept(MediaType.APPLICATION_JSON)),
-            handler::crearInmueble
-        );
+            POST(BASE_PATH).and(accept(MediaType.APPLICATION_JSON)),handler::crearInmueble)
+                .andRoute(GET(BASE_PATH).and(accept(MediaType.APPLICATION_JSON)), handler::getinmueblesByUser);
     }
 }

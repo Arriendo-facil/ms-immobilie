@@ -5,7 +5,8 @@ import co.com.bancolombia.api.dto.inmueble.CreateInmuebleDto;
 import co.com.bancolombia.api.mapper.InmuebleApiMapper;
 import co.com.bancolombia.model.exception.UnauthorizedException;
 import co.com.bancolombia.model.exception.ValidationException;
-import co.com.bancolombia.usecase.crearInmueble.CrearInmuebleUseCase;
+import co.com.bancolombia.usecase.inmueble.CrearInmuebleUseCase;
+import co.com.bancolombia.usecase.inmueble.FindAllImobilieByUserUseCase;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Validator;
@@ -16,6 +17,7 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.Set;
@@ -26,6 +28,8 @@ import java.util.Set;
 public class InmuebleHandler {
 
     private final CrearInmuebleUseCase crearInmuebleUseCase;
+    private final FindAllImobilieByUserUseCase findAllImobilieByUserUseCase;
+
     private final InmuebleApiMapper mapper;
     private final Validator validator;
 
@@ -46,6 +50,27 @@ public class InmuebleHandler {
                             .status(HttpStatus.CREATED)
                             .contentType(MediaType.APPLICATION_JSON)
                             .bodyValue(mapper.toResponse(result)));
+        });
+    }
+
+    public Mono<ServerResponse> getinmueblesByUser(ServerRequest request) {
+        return Mono.deferContextual(ctx -> {
+            String userId = ctx.<String>getOrEmpty(UserIdExtractorFilter.CTX_USER_ID).orElse(null);
+
+            if (userId == null) {
+                return Mono.error(new ValidationException("MISSING_USER_IDENTITY", "No hay usuario para consultar"));
+            }
+
+            log.info("[GET_INMUEBLE_BY_USER] userId={} - iniciando consulta de propiedades", userId);
+
+            return findAllImobilieByUserUseCase.execute(userId)
+                    .map(mapper::toResponse)
+                    .collectList()
+                    .flatMap(list -> ServerResponse
+                            .ok()
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .bodyValue(list)
+                    );
         });
     }
 
