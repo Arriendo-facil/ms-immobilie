@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.TransientDataAccessException;
 import org.springframework.stereotype.Repository;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 import reactor.util.retry.Retry;
 
 import java.time.Duration;
@@ -34,6 +35,16 @@ public class FotoRepositoryAdapter implements FotoRepository {
                         .filter(ex -> ex instanceof TransientDataAccessException)
                         .doBeforeRetry(signal -> log.warn(
                                 "[FotoRepository] Reintento #{} en findByPropertyId() — causa: {}",
+                                signal.totalRetries() + 1, signal.failure().getMessage())));
+    }
+
+    @Override
+    public Mono<Void> deleteAllByInmuebleId(String inmuebleId) {
+        return r2dbcRepository.deleteAllByPropertyId(inmuebleId)
+                .retryWhen(Retry.fixedDelay(2, Duration.ofMillis(150))
+                        .filter(ex -> ex instanceof TransientDataAccessException)
+                        .doBeforeRetry(signal -> log.warn(
+                                "[FotoRepository] Reintento #{} en deleteAllByInmuebleId() — causa: {}",
                                 signal.totalRetries() + 1, signal.failure().getMessage())));
     }
 }

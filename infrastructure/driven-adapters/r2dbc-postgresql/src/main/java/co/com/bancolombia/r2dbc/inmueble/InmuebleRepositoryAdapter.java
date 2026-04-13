@@ -57,4 +57,17 @@ public class InmuebleRepositoryAdapter implements InmuebleRepository {
                 );
 
     }
+
+    @Override
+    public Mono<Inmueble> findById(String id) {
+        return r2dbcRepository.findById(id)
+                .map(mapper::toDomain)
+                .retryWhen(Retry.fixedDelay(2, Duration.ofMillis(150))
+                        .filter(ex -> ex instanceof TransientDataAccessException)
+                        .doBeforeRetry(signal -> log.warn(
+                                "[InmuebleRepository] Reintento #{} en findById() — causa: {}",
+                                signal.totalRetries() + 1, signal.failure().getMessage()
+                        ))
+                );
+    }
 }

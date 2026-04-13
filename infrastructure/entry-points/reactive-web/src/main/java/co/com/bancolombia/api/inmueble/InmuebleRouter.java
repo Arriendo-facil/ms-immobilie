@@ -175,12 +175,101 @@ public class InmuebleRouter {
                     )
                 }
             )
+        ),
+        @RouterOperation(
+            path = BASE_PATH + "/{id}",
+            method = RequestMethod.PUT,
+            beanClass = InmuebleHandler.class,
+            beanMethod = "updateInmueble",
+            operation = @Operation(
+                operationId = "updateInmueble",
+                summary = "Actualizar un inmueble existente",
+                description = """
+                    Actualiza los datos y las fotos de un inmueble publicado por el usuario autenticado.
+
+                    **Reglas de negocio:**
+                    - La identidad del propietario se extrae del header `X-User-Id`, propagado por el API Gateway. Si el header está ausente, se retorna `401 Unauthorized`.
+                    - Si el inmueble no existe, se retorna `404 Not Found`.
+                    - Las fotos anteriores son eliminadas y reemplazadas por las nuevas enviadas en el request.
+                    - Los valores de `order` dentro de la lista de fotos deben ser **únicos**. Dos fotos con el mismo `order` retornan `400 Bad Request`.
+                    """,
+                tags = {"Inmuebles"},
+                parameters = {
+                    @Parameter(
+                        name = "id",
+                        in = ParameterIn.PATH,
+                        description = "Identificador único del inmueble a actualizar",
+                        required = true,
+                        example = "550e8400-e29b-41d4-a716-446655440000",
+                        schema = @Schema(type = "string")
+                    ),
+                    @Parameter(
+                        name = "X-User-Id",
+                        in = ParameterIn.HEADER,
+                        description = "Identificador del usuario propietario, propagado por el API Gateway. Requerido — su ausencia retorna 401.",
+                        required = true,
+                        example = "usr_01HX9Z",
+                        schema = @Schema(type = "string")
+                    )
+                },
+                requestBody = @RequestBody(
+                    description = "Nuevos datos del inmueble y sus fotos",
+                    required = true,
+                    content = @Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = @Schema(implementation = CreateInmuebleDto.class)
+                    )
+                ),
+                responses = {
+                    @ApiResponse(
+                        responseCode = "200",
+                        description = "Inmueble actualizado exitosamente",
+                        content = @Content(
+                            mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = InmuebleResponse.class)
+                        )
+                    ),
+                    @ApiResponse(
+                        responseCode = "400",
+                        description = "Datos de entrada inválidos — validación de campos fallida o valores de `order` duplicados en la lista de fotos (errorCode: `VALIDATION_ERROR`)",
+                        content = @Content(
+                            mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class)
+                        )
+                    ),
+                    @ApiResponse(
+                        responseCode = "401",
+                        description = "Header `X-User-Id` ausente o vacío — el API Gateway no propagó la identidad del usuario (errorCode: `MISSING_USER_IDENTITY`)",
+                        content = @Content(
+                            mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class)
+                        )
+                    ),
+                    @ApiResponse(
+                        responseCode = "404",
+                        description = "Inmueble no encontrado — el id proporcionado no corresponde a ningún inmueble registrado (errorCode: `NOT_FOUND`)",
+                        content = @Content(
+                            mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class)
+                        )
+                    ),
+                    @ApiResponse(
+                        responseCode = "500",
+                        description = "Error interno del servidor",
+                        content = @Content(
+                            mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class)
+                        )
+                    )
+                }
+            )
         )
     })
     @Bean
     public RouterFunction<ServerResponse> inmuebleRoutes(InmuebleHandler handler) {
         return RouterFunctions.route(
             POST(BASE_PATH).and(accept(MediaType.APPLICATION_JSON)),handler::crearInmueble)
-                .andRoute(GET(BASE_PATH).and(accept(MediaType.APPLICATION_JSON)), handler::getinmueblesByUser);
+                .andRoute(GET(BASE_PATH).and(accept(MediaType.APPLICATION_JSON)), handler::getinmueblesByUser)
+                .andRoute(PUT(BASE_PATH + "/{id}").and(accept(MediaType.APPLICATION_JSON)), handler::updateInmueble);
     }
 }

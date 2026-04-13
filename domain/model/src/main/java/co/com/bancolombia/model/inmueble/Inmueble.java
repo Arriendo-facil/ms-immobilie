@@ -31,4 +31,27 @@ public class Inmueble {
     private LocalDateTime pausedAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+
+    public Inmueble update(Inmueble newInmueble) {
+        return Inmueble.builder()
+                .id(this.getId())
+                .userId(this.userId)
+                .title(newInmueble.getTitle())
+                .description(newInmueble.getDescription())
+                .squareMeters(newInmueble.getSquareMeters())
+                .price(newInmueble.getPrice())
+                .businessType(newInmueble.getBusinessType())
+                .propertyType(newInmueble.getPropertyType())
+                .status(this.status)
+                .department(newInmueble.getDepartment())
+                .country(newInmueble.getCountry())
+                .city(newInmueble.getCity())
+                .fullAddress(newInmueble.getFullAddress())
+                .publishedAt(this.publishedAt)
+                .expiresAt(this.expiresAt)
+                .pausedAt(this.pausedAt)
+                .createdAt(this.createdAt)
+                .updatedAt(this.updatedAt)
+                .build();
+    }
 }
