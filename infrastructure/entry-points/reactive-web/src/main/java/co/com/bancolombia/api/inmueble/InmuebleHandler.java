@@ -7,6 +7,7 @@ import co.com.bancolombia.model.exception.UnauthorizedException;
 import co.com.bancolombia.model.exception.ValidationException;
 import co.com.bancolombia.usecase.inmueble.CrearInmuebleUseCase;
 import co.com.bancolombia.usecase.inmueble.FindAllImobilieByUserUseCase;
+import co.com.bancolombia.usecase.inmueble.UpdateInmuebleUseCase;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Validator;
@@ -29,6 +30,7 @@ public class InmuebleHandler {
 
     private final CrearInmuebleUseCase crearInmuebleUseCase;
     private final FindAllImobilieByUserUseCase findAllImobilieByUserUseCase;
+    private final UpdateInmuebleUseCase updateInmuebleUseCase;
 
     private final InmuebleApiMapper mapper;
     private final Validator validator;
@@ -71,6 +73,31 @@ public class InmuebleHandler {
                             .contentType(MediaType.APPLICATION_JSON)
                             .bodyValue(list)
                     );
+        });
+    }
+
+    public Mono<ServerResponse> updateInmueble(ServerRequest request) {
+        return Mono.deferContextual(ctx -> {
+            String userId = ctx.<String>getOrEmpty(UserIdExtractorFilter.CTX_USER_ID).orElse(null);
+            if (userId == null) {
+                return Mono.error(new UnauthorizedException("MISSING_USER_IDENTITY",
+                        "El gateway no proporcionó identidad de usuario"));
+            }
+
+            String inmuebleId = request.pathVariable("id");
+            log.info("[UPDATE_INMUEBLE] userId={} inmuebleId={} - iniciando actualización", userId, inmuebleId);
+            return request.bodyToMono(CreateInmuebleDto.class)
+                    .doOnNext(this::validate)
+                    .doOnNext(this::validateFotoOrders)
+                    .flatMap(dto -> updateInmuebleUseCase.execute(
+                            mapper.toInmueble(dto, userId).toBuilder().id(inmuebleId).build(),
+                            mapper.toFotos(dto.fotos())
+                    ))
+                    .doOnSuccess(result -> log.info("[UPDATE_INMUEBLE] userId={} inmuebleId={} - actualización exitosa", userId, inmuebleId))
+                    .flatMap(result -> ServerResponse
+                            .ok()
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .bodyValue(mapper.toResponse(result)));
         });
     }
 
