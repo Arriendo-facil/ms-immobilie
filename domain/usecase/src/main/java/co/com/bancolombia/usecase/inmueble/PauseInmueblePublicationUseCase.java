@@ -1,6 +1,6 @@
 package co.com.bancolombia.usecase.inmueble;
 
-import co.com.bancolombia.model.events.DeleteInmueble;
+import co.com.bancolombia.model.events.DeleteInmuebleEvent;
 import co.com.bancolombia.model.events.gateways.EventsGateway;
 import co.com.bancolombia.model.exception.NotFoundException;
 import co.com.bancolombia.model.inmueble.Inmueble;
@@ -22,7 +22,7 @@ public class PauseInmueblePublicationUseCase {
                 .map(Inmueble::pause)
                 .flatMap(inmuebleRepository::save)
                 .flatMap(saved -> eventsGateway.emit(
-                        DeleteInmueble
+                        DeleteInmuebleEvent
                                 .builder()
                                 .inmuebleId(saved.getId())
                                 .build())

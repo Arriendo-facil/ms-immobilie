@@ -5,8 +5,8 @@ import lombok.Getter;
 
 @Getter
 @Builder
-public class DeleteInmueble implements DomainEvent{
-    private static final String TYPE = "co.arriendo.facil.inmueble.updated";
+public class DeleteInmuebleEvent implements DomainEvent{
+    private static final String TYPE = "co.arriendo.facil.inmueble.delete";
 
     private final String inmuebleId;
 

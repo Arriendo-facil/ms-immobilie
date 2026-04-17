@@ -10,6 +10,7 @@ import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Getter
 @NoArgsConstructor
@@ -78,7 +79,7 @@ public class Inmueble {
     public Inmueble publish() {
         LocalDateTime publishedAt = LocalDateTime.now();
         return this.toBuilder()
-                .id(java.util.UUID.randomUUID().toString())
+                .id(UUID.randomUUID().toString())
                 .status(InmuebleStatus.ACTIVE)
                 .publishedAt(publishedAt)
                 .expiresAt(publishedAt.plusDays(30))

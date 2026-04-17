@@ -16,6 +16,8 @@ import co.com.bancolombia.model.exception.NotFoundException;
 import co.com.bancolombia.usecase.inmueble.CrearInmuebleUseCase;
 import co.com.bancolombia.usecase.inmueble.FindAllImobilieByUserUseCase;
 import co.com.bancolombia.usecase.inmueble.PauseInmueblePublicationUseCase;
+import co.com.bancolombia.usecase.inmueble.RenewInmuebleUseCase;
+import co.com.bancolombia.usecase.inmueble.ResumeInmuebleUseCase;
 import co.com.bancolombia.usecase.inmueble.UpdateInmuebleUseCase;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -57,13 +59,19 @@ class InmuebleHandlerTest {
     @Mock
     private PauseInmueblePublicationUseCase pauseInmueblePublicationUseCase;
 
+    @Mock
+    private ResumeInmuebleUseCase resumeInmuebleUseCase;
+
+    @Mock
+    private RenewInmuebleUseCase renewInmuebleUseCase;
+
     private WebTestClient webTestClient;
 
     @BeforeEach
     void setUp() {
         var mapper = new InmuebleApiMapperImpl();
         var validator = Validation.buildDefaultValidatorFactory().getValidator();
-        var handler = new InmuebleHandler(crearInmuebleUseCase, findAllImobilieByUserUseCase, updateInmuebleUseCase, pauseInmueblePublicationUseCase, mapper, validator);
+        var handler = new InmuebleHandler(crearInmuebleUseCase, findAllImobilieByUserUseCase, updateInmuebleUseCase, pauseInmueblePublicationUseCase, resumeInmuebleUseCase, renewInmuebleUseCase, mapper, validator);
         var routerFunction = new InmuebleRouter().inmuebleRoutes(handler);
 
         var errorHandler = new GlobalErrorHandler();
