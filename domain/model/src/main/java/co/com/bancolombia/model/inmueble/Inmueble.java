@@ -1,11 +1,14 @@
 package co.com.bancolombia.model.inmueble;
 
+import co.com.bancolombia.model.exception.ConflictException;
+import co.com.bancolombia.model.exception.ForbiddenException;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.LocalDateTime;
 
 @Getter
@@ -54,4 +57,57 @@ public class Inmueble {
                 .updatedAt(this.updatedAt)
                 .build();
     }
+
+    public Inmueble requireOwner(String requestingUserId) {
+        if (!this.userId.equals(requestingUserId)) {
+            throw new ForbiddenException("FORBIDDEN", "No tienes permiso para modificar este inmueble");
+        }
+        return this;
+    }
+
+    public Inmueble requireStatus(InmuebleStatus status) {
+        if (this.status != status) {
+            throw new ConflictException(
+                    "INVALID_STATE",
+                    String.format("El inmueble debe estar %s, estado actual: %s", status, this.status)
+            );
+        }
+        return this;
+    }
+
+    public Inmueble publish() {
+        LocalDateTime publishedAt = LocalDateTime.now();
+        return this.toBuilder()
+                .id(java.util.UUID.randomUUID().toString())
+                .status(InmuebleStatus.ACTIVE)
+                .publishedAt(publishedAt)
+                .expiresAt(publishedAt.plusDays(30))
+                .build();
+    }
+
+    public Inmueble pause() {
+        return this.toBuilder()
+                .status(InmuebleStatus.PAUSED)
+                .pausedAt(LocalDateTime.now())
+                .build();
+    }
+
+    public Inmueble resume() {
+        Duration pauseDuration = Duration.between(this.pausedAt, LocalDateTime.now());
+        return this.toBuilder()
+                .status(InmuebleStatus.ACTIVE)
+                .expiresAt(this.expiresAt.plus(pauseDuration))
+                .pausedAt(null)
+                .build();
+    }
+
+    public Inmueble renew() {
+        return this.toBuilder()
+                .status(InmuebleStatus.ACTIVE)
+                .expiresAt(LocalDateTime.now().plusDays(30))
+                .build();
+    }
+
+
+
 }

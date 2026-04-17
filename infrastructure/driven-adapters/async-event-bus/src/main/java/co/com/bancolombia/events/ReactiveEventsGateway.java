@@ -1,5 +1,6 @@
 package co.com.bancolombia.events;
 
+import co.com.bancolombia.model.events.DomainEvent;
 import co.com.bancolombia.model.events.gateways.EventsGateway;
 import io.cloudevents.CloudEvent;
 import io.cloudevents.core.builder.CloudEventBuilder;
@@ -23,19 +24,18 @@ import static reactor.core.publisher.Mono.from;
 @EnableDomainEventBus
 public class ReactiveEventsGateway implements EventsGateway {
 
-    public static final String INMUEBLE_CREATED_EVENT = "co.arriendo-facil.inmueble.created";
     public static final String EVENT_SOURCE = "ms-immobilie";
 
     private final DomainEventBus domainEventBus;
     private final JsonMapper mapper;
 
     @Override
-    public Mono<Void> emit(Object event) {
-        log.log(Level.INFO, "Publicando evento: {0}", INMUEBLE_CREATED_EVENT);
+    public Mono<Void> emit(DomainEvent event) {
+        log.log(Level.INFO, "Publicando evento: {0}", event.eventType());
         CloudEvent cloudEvent = CloudEventBuilder.v1()
                 .withId(UUID.randomUUID().toString())
                 .withSource(URI.create(EVENT_SOURCE))
-                .withType(INMUEBLE_CREATED_EVENT)
+                .withType(event.eventType())
                 .withTime(OffsetDateTime.now())
                 .withData("application/json", JsonCloudEventData.wrap(mapper.valueToTree(event)))
                 .build();
@@ -43,12 +43,12 @@ public class ReactiveEventsGateway implements EventsGateway {
     }
 
     @Override
-    public Mono<Void> notify(Object event) {
-        log.log(Level.INFO, "Publicando notificacion: {0}", INMUEBLE_CREATED_EVENT);
+    public Mono<Void> notify(DomainEvent event) {
+        log.log(Level.INFO, "Publicando notificacion: {0}", event.eventType());
         CloudEvent cloudEvent = CloudEventBuilder.v1()
                 .withId(UUID.randomUUID().toString())
                 .withSource(URI.create(EVENT_SOURCE))
-                .withType(INMUEBLE_CREATED_EVENT)
+                .withType(event.eventType())
                 .withTime(OffsetDateTime.now())
                 .withData("application/json", JsonCloudEventData.wrap(mapper.valueToTree(event)))
                 .build();

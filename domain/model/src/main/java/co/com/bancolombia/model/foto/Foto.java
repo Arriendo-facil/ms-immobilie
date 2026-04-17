@@ -6,6 +6,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.UUID;
 
 @Getter
 @NoArgsConstructor
@@ -17,4 +19,13 @@ public class Foto {
     private String url;
     private Integer order;
     private LocalDateTime createdAt;
+
+    public static List<Foto> prepareForSave(List<Foto> fotos, String propertyId) {
+        return fotos.stream()
+                .map(foto -> foto.toBuilder()
+                        .id(UUID.randomUUID().toString())
+                        .propertyId(propertyId)
+                        .build())
+                .toList();
+    }
 }
