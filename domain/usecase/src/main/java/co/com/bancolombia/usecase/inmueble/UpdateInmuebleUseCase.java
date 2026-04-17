@@ -3,6 +3,7 @@ package co.com.bancolombia.usecase.inmueble;
 import co.com.bancolombia.model.events.InmueblePublicData;
 import co.com.bancolombia.model.events.UpdateInmuebleEvent;
 import co.com.bancolombia.model.events.gateways.EventsGateway;
+import co.com.bancolombia.model.exception.ForbiddenException;
 import co.com.bancolombia.model.exception.NotFoundException;
 import co.com.bancolombia.model.foto.Foto;
 import co.com.bancolombia.model.foto.gateways.FotoRepository;
@@ -29,7 +30,9 @@ public class UpdateInmuebleUseCase {
                                         "NOT_FOUND", "El inmueble no esta registrado: " + inmueble.getId()
                                 )
                         )
-                ).map(inmuebleDb -> inmuebleDb.update(inmueble))
+                )
+                .map(inmuebleDb -> inmuebleDb.requireOwner(inmueble.getUserId()))
+                .map(inmuebleDb -> inmuebleDb.update(inmueble))
                 .flatMap(updated -> fotoRepository.deleteAllByInmuebleId(updated.getId())
                         .then(inmuebleRepository.save(updated))
                         .flatMap(saved -> fotoRepository.saveAll(photos)

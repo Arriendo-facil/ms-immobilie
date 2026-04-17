@@ -4,20 +4,18 @@ import co.com.bancolombia.model.events.InmuebleCreatedEvent;
 import co.com.bancolombia.model.events.InmueblePublicData;
 import co.com.bancolombia.model.events.gateways.EventsGateway;
 import co.com.bancolombia.model.exception.ForbiddenException;
+import co.com.bancolombia.model.exception.NotFoundException;
 import co.com.bancolombia.model.foto.Foto;
 import co.com.bancolombia.model.foto.gateways.FotoRepository;
 import co.com.bancolombia.model.inmueble.Inmueble;
 import co.com.bancolombia.model.inmueble.InmuebleConFotos;
-import co.com.bancolombia.model.inmueble.InmuebleStatus;
 import co.com.bancolombia.model.inmueble.gateways.InmuebleRepository;
 import co.com.bancolombia.model.user.gateways.UserClient;
 import lombok.RequiredArgsConstructor;
 import reactor.core.publisher.Mono;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 @RequiredArgsConstructor
 public class CrearInmuebleUseCase {
@@ -31,6 +29,7 @@ public class CrearInmuebleUseCase {
 
     public Mono<InmuebleConFotos> execute(Inmueble inmueble, List<Foto> photos) {
         return userClient.findById(inmueble.getUserId())
+                .switchIfEmpty(Mono.error(new NotFoundException("NOT_FOUND", "No se pudo obtener la informacion del usuario")))
                 .flatMap(userData -> checkPlanLimit(inmueble.getUserId())
                         .then(Mono.defer(() -> buildAndSaveInmueble(inmueble)))
                         .flatMap(saved -> savePhotos(photos, saved)
@@ -47,23 +46,11 @@ public class CrearInmuebleUseCase {
     }
 
     private Mono<Inmueble> buildAndSaveInmueble(Inmueble inmueble) {
-        LocalDateTime publishedAt = LocalDateTime.now();
-        return inmuebleRepository.save(inmueble.toBuilder()
-                .id(UUID.randomUUID().toString())
-                .status(InmuebleStatus.ACTIVE)
-                .publishedAt(publishedAt)
-                .expiresAt(publishedAt.plusDays(30))
-                .build());
+        return inmuebleRepository.save(inmueble.publish());
     }
 
     private Mono<List<Foto>> savePhotos(List<Foto> photos, Inmueble inmueble) {
-        List<Foto> photosWithId = photos.stream()
-                .map(photo -> photo.toBuilder()
-                        .id(UUID.randomUUID().toString())
-                        .propertyId(inmueble.getId())
-                        .build())
-                .toList();
-        return fotoRepository.saveAll(photosWithId).collectList();
+        return fotoRepository.saveAll(Foto.prepareForSave(photos, inmueble.getId())).collectList();
     }
 
     private Mono<InmuebleConFotos> emitEventAndReturn(Inmueble inmueble, List<Foto> photos, Map<String, Object> userData) {

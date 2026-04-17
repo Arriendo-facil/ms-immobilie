@@ -1,5 +1,6 @@
 package co.com.bancolombia.events;
 
+import co.com.bancolombia.model.events.DomainEvent;
 import io.cloudevents.CloudEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -34,7 +35,8 @@ class ReactiveEventsGatewayTest {
 
     private ReactiveEventsGateway gateway;
 
-    private static final Object DUMMY_EVENT = new Object();
+    private static final String TEST_EVENT_TYPE = "co.arriendo-facil.test.event";
+    private static final DomainEvent DUMMY_EVENT = () -> TEST_EVENT_TYPE;
 
     @BeforeEach
     void setUp() {
@@ -61,8 +63,7 @@ class ReactiveEventsGatewayTest {
         gateway.emit(DUMMY_EVENT).block();
 
         verify(domainEventBus).emit(captor.capture());
-        assertThat(captor.getValue().getType())
-                .isEqualTo(ReactiveEventsGateway.INMUEBLE_CREATED_EVENT);
+        assertThat(captor.getValue().getType()).isEqualTo(TEST_EVENT_TYPE);
     }
 
     @Test
@@ -141,8 +142,7 @@ class ReactiveEventsGatewayTest {
         gateway.notify(DUMMY_EVENT).block();
 
         verify(domainEventBus).emit(captor.capture());
-        assertThat(captor.getValue().getType())
-                .isEqualTo(ReactiveEventsGateway.INMUEBLE_CREATED_EVENT);
+        assertThat(captor.getValue().getType()).isEqualTo(TEST_EVENT_TYPE);
     }
 
     @Test

@@ -177,6 +177,278 @@ public class InmuebleRouter {
             )
         ),
         @RouterOperation(
+            path = BASE_PATH + "/{id}/pause",
+            method = RequestMethod.PATCH,
+            beanClass = InmuebleHandler.class,
+            beanMethod = "pauseInmueble",
+            operation = @Operation(
+                operationId = "pauseInmueble",
+                summary = "Pausar la publicación de un inmueble",
+                description = """
+                    Pausa la publicación de un inmueble activo. El inmueble deja de aparecer en los resultados de búsqueda.
+
+                    **Reglas de negocio:**
+                    - La identidad del propietario se extrae del header `X-User-Id`, propagado por el API Gateway. Si el header está ausente, se retorna `401 Unauthorized`.
+                    - Solo el propietario del inmueble puede pausarlo. Intentar pausar un inmueble ajeno retorna `403 Forbidden`.
+                    - El inmueble debe estar en estado `ACTIVE` para poder pausarse. Cualquier otro estado retorna `409 Conflict`.
+                    - Si el inmueble no existe, se retorna `404 Not Found`.
+                    """,
+                tags = {"Inmuebles"},
+                parameters = {
+                    @Parameter(
+                        name = "id",
+                        in = ParameterIn.PATH,
+                        description = "Identificador único del inmueble a pausar",
+                        required = true,
+                        example = "550e8400-e29b-41d4-a716-446655440000",
+                        schema = @Schema(type = "string")
+                    ),
+                    @Parameter(
+                        name = "X-User-Id",
+                        in = ParameterIn.HEADER,
+                        description = "Identificador del usuario propietario, propagado por el API Gateway. Requerido — su ausencia retorna 401.",
+                        required = true,
+                        example = "usr_01HX9Z",
+                        schema = @Schema(type = "string")
+                    )
+                },
+                responses = {
+                    @ApiResponse(
+                        responseCode = "204",
+                        description = "Inmueble pausado exitosamente"
+                    ),
+                    @ApiResponse(
+                        responseCode = "401",
+                        description = "Header `X-User-Id` ausente o vacío — el API Gateway no propagó la identidad del usuario (errorCode: `MISSING_USER_IDENTITY`)",
+                        content = @Content(
+                            mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class)
+                        )
+                    ),
+                    @ApiResponse(
+                        responseCode = "403",
+                        description = "El usuario no es propietario del inmueble (errorCode: `FORBIDDEN`)",
+                        content = @Content(
+                            mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class)
+                        )
+                    ),
+                    @ApiResponse(
+                        responseCode = "404",
+                        description = "Inmueble no encontrado (errorCode: `NOT_FOUND`)",
+                        content = @Content(
+                            mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class)
+                        )
+                    ),
+                    @ApiResponse(
+                        responseCode = "409",
+                        description = "El inmueble no está en estado ACTIVE — transición de estado inválida (errorCode: `INVALID_STATE`)",
+                        content = @Content(
+                            mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class)
+                        )
+                    ),
+                    @ApiResponse(
+                        responseCode = "500",
+                        description = "Error interno del servidor",
+                        content = @Content(
+                            mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class)
+                        )
+                    )
+                }
+            )
+        ),
+        @RouterOperation(
+            path = BASE_PATH + "/{id}/resume",
+            method = RequestMethod.PATCH,
+            beanClass = InmuebleHandler.class,
+            beanMethod = "resumeInmueble",
+            operation = @Operation(
+                operationId = "resumeInmueble",
+                summary = "Reactivar la publicación de un inmueble",
+                description = """
+                    Reactiva un inmueble pausado. El inmueble vuelve a aparecer en los resultados de búsqueda.
+
+                    **Reglas de negocio:**
+                    - La identidad del propietario se extrae del header `X-User-Id`, propagado por el API Gateway. Si el header está ausente, se retorna `401 Unauthorized`.
+                    - Solo el propietario del inmueble puede reactivarlo. Intentar reactivar un inmueble ajeno retorna `403 Forbidden`.
+                    - El inmueble debe estar en estado `PAUSED` para poder reactivarse. Cualquier otro estado retorna `409 Conflict`.
+                    - Si el inmueble no existe, se retorna `404 Not Found`.
+                    - El tiempo que el inmueble estuvo pausado **no descuenta** de su vigencia: `expiresAt` se extiende automáticamente por la duración de la pausa.
+                    - El servicio depende de **ms-user** para validar la existencia del propietario. Si ms-user no está disponible, se retorna `503 Service Unavailable`.
+                    """,
+                tags = {"Inmuebles"},
+                parameters = {
+                    @Parameter(
+                        name = "id",
+                        in = ParameterIn.PATH,
+                        description = "Identificador único del inmueble a reactivar",
+                        required = true,
+                        example = "550e8400-e29b-41d4-a716-446655440000",
+                        schema = @Schema(type = "string")
+                    ),
+                    @Parameter(
+                        name = "X-User-Id",
+                        in = ParameterIn.HEADER,
+                        description = "Identificador del usuario propietario, propagado por el API Gateway. Requerido — su ausencia retorna 401.",
+                        required = true,
+                        example = "usr_01HX9Z",
+                        schema = @Schema(type = "string")
+                    )
+                },
+                responses = {
+                    @ApiResponse(
+                        responseCode = "204",
+                        description = "Inmueble reactivado exitosamente"
+                    ),
+                    @ApiResponse(
+                        responseCode = "401",
+                        description = "Header `X-User-Id` ausente o vacío — el API Gateway no propagó la identidad del usuario (errorCode: `MISSING_USER_IDENTITY`)",
+                        content = @Content(
+                            mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class)
+                        )
+                    ),
+                    @ApiResponse(
+                        responseCode = "403",
+                        description = "El usuario no es propietario del inmueble (errorCode: `FORBIDDEN`)",
+                        content = @Content(
+                            mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class)
+                        )
+                    ),
+                    @ApiResponse(
+                        responseCode = "404",
+                        description = "Inmueble no encontrado (errorCode: `NOT_FOUND`)",
+                        content = @Content(
+                            mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class)
+                        )
+                    ),
+                    @ApiResponse(
+                        responseCode = "409",
+                        description = "El inmueble no está en estado PAUSED — transición de estado inválida (errorCode: `INVALID_STATE`)",
+                        content = @Content(
+                            mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class)
+                        )
+                    ),
+                    @ApiResponse(
+                        responseCode = "503",
+                        description = "Servicio ms-user no disponible — no fue posible validar el propietario",
+                        content = @Content(
+                            mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class)
+                        )
+                    ),
+                    @ApiResponse(
+                        responseCode = "500",
+                        description = "Error interno del servidor",
+                        content = @Content(
+                            mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class)
+                        )
+                    )
+                }
+            )
+        ),
+        @RouterOperation(
+            path = BASE_PATH + "/{id}/renew",
+            method = RequestMethod.PATCH,
+            beanClass = InmuebleHandler.class,
+            beanMethod = "renewInmueble",
+            operation = @Operation(
+                operationId = "renewInmueble",
+                summary = "Renovar la publicación de un inmueble",
+                description = """
+                    Renueva la vigencia de un inmueble expirado. El inmueble vuelve a aparecer en los resultados de búsqueda con una vigencia de 30 días a partir del momento de la renovación.
+
+                    **Reglas de negocio:**
+                    - La identidad del propietario se extrae del header `X-User-Id`, propagado por el API Gateway. Si el header está ausente, se retorna `401 Unauthorized`.
+                    - Solo el propietario del inmueble puede renovarlo. Intentar renovar un inmueble ajeno retorna `403 Forbidden`.
+                    - El inmueble debe estar en estado `INACTIVE` para poder renovarse. Cualquier otro estado retorna `409 Conflict`.
+                    - Si el inmueble no existe, se retorna `404 Not Found`.
+                    - La fecha original de publicación (`publishedAt`) no se modifica; solo se actualiza `expiresAt` con 30 días desde el momento de la renovación.
+                    - El servicio depende de **ms-user** para validar la existencia del propietario. Si ms-user no está disponible, se retorna `503 Service Unavailable`.
+                    """,
+                tags = {"Inmuebles"},
+                parameters = {
+                    @Parameter(
+                        name = "id",
+                        in = ParameterIn.PATH,
+                        description = "Identificador único del inmueble a renovar",
+                        required = true,
+                        example = "550e8400-e29b-41d4-a716-446655440000",
+                        schema = @Schema(type = "string")
+                    ),
+                    @Parameter(
+                        name = "X-User-Id",
+                        in = ParameterIn.HEADER,
+                        description = "Identificador del usuario propietario, propagado por el API Gateway. Requerido — su ausencia retorna 401.",
+                        required = true,
+                        example = "usr_01HX9Z",
+                        schema = @Schema(type = "string")
+                    )
+                },
+                responses = {
+                    @ApiResponse(
+                        responseCode = "204",
+                        description = "Inmueble renovado exitosamente"
+                    ),
+                    @ApiResponse(
+                        responseCode = "401",
+                        description = "Header `X-User-Id` ausente o vacío — el API Gateway no propagó la identidad del usuario (errorCode: `MISSING_USER_IDENTITY`)",
+                        content = @Content(
+                            mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class)
+                        )
+                    ),
+                    @ApiResponse(
+                        responseCode = "403",
+                        description = "El usuario no es propietario del inmueble (errorCode: `FORBIDDEN`)",
+                        content = @Content(
+                            mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class)
+                        )
+                    ),
+                    @ApiResponse(
+                        responseCode = "404",
+                        description = "Inmueble no encontrado (errorCode: `NOT_FOUND`)",
+                        content = @Content(
+                            mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class)
+                        )
+                    ),
+                    @ApiResponse(
+                        responseCode = "409",
+                        description = "El inmueble no está en estado INACTIVE — transición de estado inválida (errorCode: `INVALID_STATE`)",
+                        content = @Content(
+                            mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class)
+                        )
+                    ),
+                    @ApiResponse(
+                        responseCode = "503",
+                        description = "Servicio ms-user no disponible — no fue posible validar el propietario",
+                        content = @Content(
+                            mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class)
+                        )
+                    ),
+                    @ApiResponse(
+                        responseCode = "500",
+                        description = "Error interno del servidor",
+                        content = @Content(
+                            mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class)
+                        )
+                    )
+                }
+            )
+        ),
+        @RouterOperation(
             path = BASE_PATH + "/{id}",
             method = RequestMethod.PUT,
             beanClass = InmuebleHandler.class,
@@ -270,6 +542,9 @@ public class InmuebleRouter {
         return RouterFunctions.route(
             POST(BASE_PATH).and(accept(MediaType.APPLICATION_JSON)),handler::crearInmueble)
                 .andRoute(GET(BASE_PATH).and(accept(MediaType.APPLICATION_JSON)), handler::getinmueblesByUser)
-                .andRoute(PUT(BASE_PATH + "/{id}").and(accept(MediaType.APPLICATION_JSON)), handler::updateInmueble);
+                .andRoute(PUT(BASE_PATH + "/{id}").and(accept(MediaType.APPLICATION_JSON)), handler::updateInmueble)
+                .andRoute(PATCH(BASE_PATH + "/{id}/pause").and(accept(MediaType.APPLICATION_JSON)), handler::pauseInmueble)
+                .andRoute(PATCH(BASE_PATH + "/{id}/resume").and(accept(MediaType.APPLICATION_JSON)), handler::resumeInmueble)
+                .andRoute(PATCH(BASE_PATH + "/{id}/renew").and(accept(MediaType.APPLICATION_JSON)), handler::renewInmueble);
     }
 }

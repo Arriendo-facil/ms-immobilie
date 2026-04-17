@@ -11,8 +11,14 @@ import co.com.bancolombia.model.inmueble.Inmueble;
 import co.com.bancolombia.model.inmueble.InmuebleConFotos;
 import co.com.bancolombia.model.inmueble.InmuebleStatus;
 import co.com.bancolombia.model.inmueble.PropertyType;
+import co.com.bancolombia.model.exception.ConflictException;
+import co.com.bancolombia.model.exception.NotFoundException;
 import co.com.bancolombia.usecase.inmueble.CrearInmuebleUseCase;
 import co.com.bancolombia.usecase.inmueble.FindAllImobilieByUserUseCase;
+import co.com.bancolombia.usecase.inmueble.PauseInmueblePublicationUseCase;
+import co.com.bancolombia.usecase.inmueble.RenewInmuebleUseCase;
+import co.com.bancolombia.usecase.inmueble.ResumeInmuebleUseCase;
+import co.com.bancolombia.usecase.inmueble.UpdateInmuebleUseCase;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -47,13 +53,25 @@ class InmuebleHandlerTest {
     @Mock
     private FindAllImobilieByUserUseCase findAllImobilieByUserUseCase;
 
+    @Mock
+    private UpdateInmuebleUseCase updateInmuebleUseCase;
+
+    @Mock
+    private PauseInmueblePublicationUseCase pauseInmueblePublicationUseCase;
+
+    @Mock
+    private ResumeInmuebleUseCase resumeInmuebleUseCase;
+
+    @Mock
+    private RenewInmuebleUseCase renewInmuebleUseCase;
+
     private WebTestClient webTestClient;
 
     @BeforeEach
     void setUp() {
         var mapper = new InmuebleApiMapperImpl();
         var validator = Validation.buildDefaultValidatorFactory().getValidator();
-        var handler = new InmuebleHandler(crearInmuebleUseCase, findAllImobilieByUserUseCase, mapper, validator);
+        var handler = new InmuebleHandler(crearInmuebleUseCase, findAllImobilieByUserUseCase, updateInmuebleUseCase, pauseInmueblePublicationUseCase, resumeInmuebleUseCase, renewInmuebleUseCase, mapper, validator);
         var routerFunction = new InmuebleRouter().inmuebleRoutes(handler);
 
         var errorHandler = new GlobalErrorHandler();
@@ -254,10 +272,10 @@ class InmuebleHandlerTest {
     }
 
     @Test
-    void getInmueblesByUser_cuandoFaltaHeaderUserId_retorna400() {
+    void getInmueblesByUser_cuandoFaltaHeaderUserId_retorna401() {
         webTestClient.get().uri(URL)
                 .exchange()
-                .expectStatus().isBadRequest()
+                .expectStatus().isUnauthorized()
                 .expectBody()
                 .jsonPath("$.errorCode").isEqualTo("MISSING_USER_IDENTITY");
     }
@@ -301,6 +319,75 @@ class InmuebleHandlerTest {
                 .jsonPath("$.length()").isEqualTo(2)
                 .jsonPath("$[0].id").isEqualTo("test-id")
                 .jsonPath("$[1].id").isEqualTo("test-id-2");
+    }
+
+    // -------------------------------------------------------------------------
+    // PATCH /api/v1/inmuebles/{id}/pause — pauseInmueble
+    // -------------------------------------------------------------------------
+
+    @Test
+    void pauseInmueble_cuandoInmuebleActivo_retorna204() {
+        when(pauseInmueblePublicationUseCase.execute("inmueble-id", "usr_01HX9Z"))
+                .thenReturn(Mono.empty());
+
+        webTestClient.patch().uri(URL + "/inmueble-id/pause")
+                .header(GlobalErrorHandler.USER_ID_HEADER, "usr_01HX9Z")
+                .accept(MediaType.APPLICATION_JSON)
+                .exchange()
+                .expectStatus().isNoContent();
+    }
+
+    @Test
+    void pauseInmueble_cuandoFaltaHeaderUserId_retorna401() {
+        webTestClient.patch().uri(URL + "/inmueble-id/pause")
+                .accept(MediaType.APPLICATION_JSON)
+                .exchange()
+                .expectStatus().isUnauthorized()
+                .expectBody()
+                .jsonPath("$.errorCode").isEqualTo("MISSING_USER_IDENTITY");
+    }
+
+    @Test
+    void pauseInmueble_cuandoInmuebleNoExiste_retorna404() {
+        when(pauseInmueblePublicationUseCase.execute("inmueble-id", "usr_01HX9Z"))
+                .thenReturn(Mono.error(new NotFoundException("NOT_FOUND", "No se encontro el inmueble")));
+
+        webTestClient.patch().uri(URL + "/inmueble-id/pause")
+                .header(GlobalErrorHandler.USER_ID_HEADER, "usr_01HX9Z")
+                .accept(MediaType.APPLICATION_JSON)
+                .exchange()
+                .expectStatus().isNotFound()
+                .expectBody()
+                .jsonPath("$.errorCode").isEqualTo("NOT_FOUND");
+    }
+
+    @Test
+    void pauseInmueble_cuandoNoEsPropietario_retorna403() {
+        when(pauseInmueblePublicationUseCase.execute("inmueble-id", "usr_01HX9Z"))
+                .thenReturn(Mono.error(new ForbiddenException("FORBIDDEN", "No tienes permiso para modificar este inmueble")));
+
+        webTestClient.patch().uri(URL + "/inmueble-id/pause")
+                .header(GlobalErrorHandler.USER_ID_HEADER, "usr_01HX9Z")
+                .accept(MediaType.APPLICATION_JSON)
+                .exchange()
+                .expectStatus().isForbidden()
+                .expectBody()
+                .jsonPath("$.errorCode").isEqualTo("FORBIDDEN");
+    }
+
+    @Test
+    void pauseInmueble_cuandoEstadoInvalido_retorna409() {
+        when(pauseInmueblePublicationUseCase.execute("inmueble-id", "usr_01HX9Z"))
+                .thenReturn(Mono.error(new ConflictException("INVALID_STATE",
+                        "El inmueble debe estar ACTIVO para pausarse, estado actual: PAUSED")));
+
+        webTestClient.patch().uri(URL + "/inmueble-id/pause")
+                .header(GlobalErrorHandler.USER_ID_HEADER, "usr_01HX9Z")
+                .accept(MediaType.APPLICATION_JSON)
+                .exchange()
+                .expectStatus().isEqualTo(409)
+                .expectBody()
+                .jsonPath("$.errorCode").isEqualTo("INVALID_STATE");
     }
 
     // --- helpers ---
