@@ -19,11 +19,12 @@ public class DeleteInmuebleUseCase {
                 .flatMap(inmueble -> Mono.when(
                         inmuebleRepository.deleteInmuebleById(inmueble.getId()),
                         fotoRepository.deleteAllByInmuebleId(inmueble.getId())
-                ))
-                .then(eventsGateway.emit(
-                        DeleteInmuebleEvent.builder()
-                                .inmuebleId(inmuebleId)
-                                .build()
+                ).then(
+                        eventsGateway.emit(
+                                DeleteInmuebleEvent.builder()
+                                        .inmuebleId(inmuebleId)
+                                        .build()
+                                )
                         )
                 );
     }
