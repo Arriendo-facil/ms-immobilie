@@ -9,4 +9,5 @@ public interface InmuebleRepository {
     Mono<Long> countCurrentByUserId(String userId);
     Flux<Inmueble> findAllByUserId(String userId);
     Mono<Inmueble> findById(String id);
+    Mono<Void> deleteInmuebleById(String id);
 }

@@ -70,4 +70,16 @@ public class InmuebleRepositoryAdapter implements InmuebleRepository {
                         ))
                 );
     }
+
+    @Override
+    public Mono<Void> deleteInmuebleById(String id) {
+        return r2dbcRepository.deleteById(id)
+                .retryWhen(Retry.fixedDelay(2, Duration.ofMillis(150))
+                        .filter(ex -> ex instanceof TransientDataAccessException)
+                        .doBeforeRetry(signal -> log.warn(
+                                "[InmuebleRepository] Reintento #{} en deleteInmuebleById() — causa: {}",
+                                signal.totalRetries() + 1, signal.failure().getMessage()
+                        ))
+                );
+    }
 }

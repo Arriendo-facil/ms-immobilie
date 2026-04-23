@@ -31,6 +31,7 @@ public class InmuebleHandler {
     private final PauseInmueblePublicationUseCase pauseInmueblePublicationUseCase;
     private final ResumeInmuebleUseCase resumeInmuebleUseCase;
     private final RenewInmuebleUseCase renewInmuebleUseCase;
+    private final DeleteInmuebleUseCase deleteInmuebleUseCase;
 
     private final InmuebleApiMapper mapper;
     private final Validator validator;
@@ -118,6 +119,16 @@ public class InmuebleHandler {
                     String inmuebleId = request.pathVariable("id");
                     log.info("[RENEW_INMUEBLE] userId={} inmuebleId={} - iniciando renovacion", userId, inmuebleId);
                     return renewInmuebleUseCase.execute(inmuebleId, userId)
+                            .then(ServerResponse.noContent().build());
+                });
+    }
+
+    public Mono<ServerResponse> deleteInmueble (ServerRequest request) {
+        return extractUserId(request)
+                .flatMap(userId -> {
+                    String inmuebleId = request.pathVariable("id");
+                    log.info("[DELETE_INMUEBLE] userId={} inmuebleId={} - iniciando eliminacion", userId, inmuebleId);
+                    return deleteInmuebleUseCase.execute(inmuebleId, userId)
                             .then(ServerResponse.noContent().build());
                 });
     }

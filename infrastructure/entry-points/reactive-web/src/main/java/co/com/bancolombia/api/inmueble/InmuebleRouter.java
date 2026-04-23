@@ -450,6 +450,83 @@ public class InmuebleRouter {
         ),
         @RouterOperation(
             path = BASE_PATH + "/{id}",
+            method = RequestMethod.DELETE,
+            beanClass = InmuebleHandler.class,
+            beanMethod = "deleteInmueble",
+            operation = @Operation(
+                operationId = "deleteInmueble",
+                summary = "Eliminar un inmueble",
+                description = """
+                    Elimina permanentemente un inmueble junto con todas sus fotos asociadas.
+
+                    **Reglas de negocio:**
+                    - La identidad del propietario se extrae del header `X-User-Id`, propagado por el API Gateway. Si el header está ausente, se retorna `401 Unauthorized`.
+                    - Solo el propietario del inmueble puede eliminarlo. Intentar eliminar un inmueble ajeno retorna `403 Forbidden`.
+                    - Si el inmueble no existe, se retorna `404 Not Found`.
+                    - La eliminación es **permanente e irreversible**: se borran el inmueble y todas sus fotos asociadas.
+                    - Se emite el evento de dominio `co.arriendo.facil.inmueble.delete` para notificar a otros servicios.
+                    """,
+                tags = {"Inmuebles"},
+                parameters = {
+                    @Parameter(
+                        name = "id",
+                        in = ParameterIn.PATH,
+                        description = "Identificador único del inmueble a eliminar",
+                        required = true,
+                        example = "550e8400-e29b-41d4-a716-446655440000",
+                        schema = @Schema(type = "string")
+                    ),
+                    @Parameter(
+                        name = "X-User-Id",
+                        in = ParameterIn.HEADER,
+                        description = "Identificador del usuario propietario, propagado por el API Gateway. Requerido — su ausencia retorna 401.",
+                        required = true,
+                        example = "usr_01HX9Z",
+                        schema = @Schema(type = "string")
+                    )
+                },
+                responses = {
+                    @ApiResponse(
+                        responseCode = "204",
+                        description = "Inmueble y sus fotos eliminados exitosamente"
+                    ),
+                    @ApiResponse(
+                        responseCode = "401",
+                        description = "Header `X-User-Id` ausente o vacío — el API Gateway no propagó la identidad del usuario (errorCode: `MISSING_USER_IDENTITY`)",
+                        content = @Content(
+                            mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class)
+                        )
+                    ),
+                    @ApiResponse(
+                        responseCode = "403",
+                        description = "El usuario no es propietario del inmueble (errorCode: `FORBIDDEN`)",
+                        content = @Content(
+                            mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class)
+                        )
+                    ),
+                    @ApiResponse(
+                        responseCode = "404",
+                        description = "Inmueble no encontrado (errorCode: `NOT_FOUND`)",
+                        content = @Content(
+                            mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class)
+                        )
+                    ),
+                    @ApiResponse(
+                        responseCode = "500",
+                        description = "Error interno del servidor",
+                        content = @Content(
+                            mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class)
+                        )
+                    )
+                }
+            )
+        ),
+        @RouterOperation(
+            path = BASE_PATH + "/{id}",
             method = RequestMethod.PUT,
             beanClass = InmuebleHandler.class,
             beanMethod = "updateInmueble",
@@ -545,6 +622,7 @@ public class InmuebleRouter {
                 .andRoute(PUT(BASE_PATH + "/{id}").and(accept(MediaType.APPLICATION_JSON)), handler::updateInmueble)
                 .andRoute(PATCH(BASE_PATH + "/{id}/pause").and(accept(MediaType.APPLICATION_JSON)), handler::pauseInmueble)
                 .andRoute(PATCH(BASE_PATH + "/{id}/resume").and(accept(MediaType.APPLICATION_JSON)), handler::resumeInmueble)
-                .andRoute(PATCH(BASE_PATH + "/{id}/renew").and(accept(MediaType.APPLICATION_JSON)), handler::renewInmueble);
+                .andRoute(PATCH(BASE_PATH + "/{id}/renew").and(accept(MediaType.APPLICATION_JSON)), handler::renewInmueble)
+                .andRoute(DELETE(BASE_PATH + "/{id}"), handler::deleteInmueble);
     }
 }
